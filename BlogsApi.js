@@ -98,14 +98,19 @@ const users = [
     "likes": 41,
     "userProfilePicture": "https://randomuser.me/api/portraits/men/10.jpg"
   }
-]
+];
 
-console.log(users);
+// ✅ Root route for health check
+app.get("/", (req, res) => {
+  res.send("🚀 API is live!");
+});
 
-app.get("/blogs/users", (req,res) =>{
-    res.json(users);
-})
+// ✅ API route
+app.get("/blogs/users", (req, res) => {
+  res.json(users);
+});
 
+// ✅ Listen on dynamic port for Render
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
