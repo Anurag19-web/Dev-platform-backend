@@ -16,7 +16,7 @@ router.post("/signup", (req, res) => {
 
   // Check if user exists by email or username
   const userExists = users.find(
-    (user) => user.email === email || user.username === username
+    (user) => user.email === email
   );
 
   if (userExists) {
