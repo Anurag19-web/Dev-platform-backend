@@ -100,17 +100,12 @@ const users = [
   }
 ];
 
-// ✅ Root route for health check
-app.get("/", (req, res) => {
-  res.send("🚀 API is live!");
-});
-
-// ✅ API route
+//API route
 app.get("/blogs/users", (req, res) => {
   res.json(users);
 });
 
-// ✅ Listen on dynamic port for Render
+//API PORT
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
