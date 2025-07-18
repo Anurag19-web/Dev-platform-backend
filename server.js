@@ -1,3 +1,5 @@
+// server.js
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -10,24 +12,43 @@ import signupApi from "./routes/signupApi.js";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS: allow both local dev and deployed frontend
+// ✅ CORS configuration — handles both frontend origins & preflight
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://dev-platform-frontend-qtfu.vercel.app"
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173", // your local React frontend
-    "https://dev-platform-frontend-qtfu.vercel.app" // deployed frontend
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
   credentials: true
 }));
 
+// ✅ Handle preflight (OPTIONS) requests
+app.options("*", cors());
+
+// ✅ Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ✅ DB Connection
 connectDB();
 
+// ✅ Routes
 app.use("/api", signupApi);
 app.use("/", blogsApi);
 
+// ✅ Health Check
 app.get("/", (req, res) => res.json({ message: "API is running" }));
 
-app.listen(PORT, () => console.log(`🚀 Server running at port ${PORT}`));
+// ✅ Start Server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at port ${PORT}`);
+});
