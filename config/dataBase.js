@@ -1,13 +1,16 @@
+// config/dataBase.js
+
 import mongoose from "mongoose";
 
 const connectDB = async () => {
   try {
-    const uri = process.env.MONGODB_URI;
-    if (!uri) throw new Error('MONGODB_URI is not defined');
-    const conn = await mongoose.connect(uri);
-    console.log("✅ MongoDB connected:", conn.connection.host);
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err.message);
+    const conn = await mongoose.connect(process.env.MONGODB_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log(`✅ MongoDB connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error("❌ MongoDB connection failed:", error.message);
     process.exit(1);
   }
 };

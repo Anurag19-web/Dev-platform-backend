@@ -1,7 +1,7 @@
 // server.js
 
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config(); // ✅ Load environment variables
 
 import express from "express";
 import cors from "cors";
@@ -12,10 +12,10 @@ import signupApi from "./routes/signupApi.js";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ CORS configuration — handles both frontend origins & preflight
+// ✅ CORS configuration
 const allowedOrigins = [
-  "http://localhost:5173",
-  "https://dev-platform-frontend-qtfu.vercel.app"
+  "http://localhost:5173", // Local dev frontend
+  "https://dev-platform-frontend-qtfu.vercel.app" // Vercel deployed frontend
 ];
 
 app.use(cors({
@@ -27,26 +27,25 @@ app.use(cors({
     }
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
-  credentials: true
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  credentials: true,
 }));
-
-// ✅ Handle preflight (OPTIONS) requests
-app.options("*", cors());
 
 // ✅ Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ DB Connection
+// ✅ Connect to MongoDB Atlas
 connectDB();
 
 // ✅ Routes
-app.use("/api", signupApi);
-app.use("/", blogsApi);
+app.use("/api", signupApi); // Handles /api/signup etc.
+app.use("/", blogsApi);     // Handles blog-related routes
 
-// ✅ Health Check
-app.get("/", (req, res) => res.json({ message: "API is running" }));
+// ✅ Health Check Route
+app.get("/", (req, res) => {
+  res.json({ message: "API is running successfully 🚀" });
+});
 
 // ✅ Start Server
 app.listen(PORT, () => {
