@@ -8,23 +8,24 @@ const router = express.Router();
 router.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
 
-  // ✅ Input validation
   if (!username || !email || !password) {
     return res.status(400).json({ message: "All fields are required." });
   }
 
   try {
-    // ✅ Check if the user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(409).json({ message: "User already exists." });
     }
 
-    // ✅ Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ✅ Create and save new user
-    const newUser = new User({ username, email, password: hashedPassword, });
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
     await newUser.save();
 
     res.status(201).json({
@@ -35,12 +36,9 @@ router.post("/signup", async (req, res) => {
         email: newUser.email,
       },
     });
-
   } catch (err) {
-    // 🛑 Log full error and request payload for debugging
     console.error("🔥 Signup Error:", err);
     console.error("📨 Payload received:", req.body);
-
     res.status(500).json({ message: err.message || "Server error." });
   }
 });
@@ -52,6 +50,23 @@ router.get("/users", async (req, res) => {
     res.json(users);
   } catch (err) {
     console.error("Fetch users error:", err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+
+// ✅ GET /api/users/:id — View single user by ID (excluding password)
+router.get("/users/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.status(200).json(user);
+  } catch (err) {
+    console.error("Fetch single user error:", err);
     res.status(500).json({ message: "Server error." });
   }
 });
