@@ -8,6 +8,7 @@ import cors from "cors";
 import connectDB from "./config/dataBase.js";
 import blogsApi from "./routes/BlogsApi.js";
 import signupApi from "./routes/signupApi.js";
+import loginApi from "./routes/loginApi.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,6 +41,7 @@ connectDB();
 
 // ✅ Routes
 app.use("/api", signupApi); // Handles /api/signup etc.
+app.use("/api",loginApi)
 app.use("/", blogsApi);     // Handles blog-related routes
 
 // ✅ Health Check Route
