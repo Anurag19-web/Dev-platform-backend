@@ -1,5 +1,7 @@
+// routes/signup.js
 import express from "express";
 import bcrypt from "bcrypt";
+import { nanoid } from "nanoid"; // ✅ for generating random userId
 import User from "../models/User.js";
 
 const router = express.Router();
@@ -19,8 +21,10 @@ router.post("/signup", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = nanoid(10); // ✅ Generate random userId like ybShmHYdbr
 
     const newUser = new User({
+      userId,
       username,
       email,
       password: hashedPassword,
@@ -31,7 +35,7 @@ router.post("/signup", async (req, res) => {
     res.status(201).json({
       message: "User registered successfully.",
       user: {
-        id: newUser._id,
+        userId: newUser.userId,
         username: newUser.username,
         email: newUser.email,
       },
@@ -46,7 +50,7 @@ router.post("/signup", async (req, res) => {
 // ✅ GET /api/users — View all users (excluding passwords)
 router.get("/users", async (req, res) => {
   try {
-    const users = await User.find({}, { password: 0 }); // hide password
+    const users = await User.find({}, { password: 0 });
     res.json(users);
   } catch (err) {
     console.error("Fetch users error:", err);
@@ -54,11 +58,10 @@ router.get("/users", async (req, res) => {
   }
 });
 
-
-// ✅ GET /api/users/:id — View single user by ID (excluding password)
-router.get("/users/:id", async (req, res) => {
+// ✅ GET /api/users/:userId — Get user by random userId
+router.get("/users/:userId", async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findOne({ userId: req.params.userId }).select("-password");
 
     if (!user) {
       return res.status(404).json({ message: "User not found." });
@@ -66,7 +69,7 @@ router.get("/users/:id", async (req, res) => {
 
     res.status(200).json(user);
   } catch (err) {
-    console.error("Fetch single user error:", err);
+    console.error("Fetch user by userId error:", err);
     res.status(500).json({ message: "Server error." });
   }
 });
