@@ -28,10 +28,13 @@ app.use(cors({
       callback(new Error("CORS not allowed"));
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   credentials: true,
 }));
+
+// ✅ Handle preflight requests (required for PATCH/PUT/DELETE CORS support)
+app.options("*", cors());
 
 // ✅ Middleware
 app.use(express.json());
@@ -41,12 +44,13 @@ app.use(express.urlencoded({ extended: true }));
 connectDB();
 
 // ✅ Routes
-app.use("/api", signupApi); // Handles /api/signup etc.
-app.use("/api",loginApi)
-app.use("/", blogsApi);     // Handles blog-related routes
-app.use("/api", userRoutes); // ✅ Add this below login route
-// Serve static files
-app.use("/uploads", express.static("uploads")); // 3️⃣ Serve profile images
+app.use("/api", signupApi);       // Handles /api/signup
+app.use("/api", loginApi);        // Handles /api/login
+app.use("/", blogsApi);           // Handles blog-related routes
+app.use("/api", userRoutes);      // Handles user profile routes
+
+// ✅ Serve static profile images
+app.use("/uploads", express.static("uploads"));
 
 // ✅ Health Check Route
 app.get("/", (req, res) => {
