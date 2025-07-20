@@ -1,4 +1,3 @@
-// routes/users.js
 import express from "express";
 import multer from "multer";
 import path from "path";
@@ -17,7 +16,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// PATCH /api/users/:id — Update profile data
+// ✅ Update profile data
 router.patch("/users/:id", async (req, res) => {
   try {
     const updatedUser = await User.findOneAndUpdate(
@@ -34,7 +33,7 @@ router.patch("/users/:id", async (req, res) => {
   }
 });
 
-// PATCH /api/users/:id/profile-picture — Upload profile picture
+// ✅ Upload profile picture
 router.patch("/users/:id/profile-picture", upload.single("profilePicture"), async (req, res) => {
   try {
     const imagePath = req.file ? `/uploads/${req.file.filename}` : "";
@@ -50,6 +49,62 @@ router.patch("/users/:id/profile-picture", upload.single("profilePicture"), asyn
     res.status(200).json({ message: "Profile picture updated", user: updatedUser });
   } catch (err) {
     res.status(500).json({ message: "Image upload failed", error: err.message });
+  }
+});
+
+
+// ✅ FOLLOW a user
+router.patch("/users/:id/follow", async (req, res) => {
+  try {
+    const { userId } = req.body; // logged-in user
+    const targetId = req.params.id; // user to follow
+
+    if (userId === targetId) {
+      return res.status(400).json({ message: "You cannot follow yourself" });
+    }
+
+    const user = await User.findOne({ userId });
+    const target = await User.findOne({ userId: targetId });
+
+    if (!user || !target) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!target.followers.includes(userId)) {
+      target.followers.push(userId);
+      user.following.push(targetId);
+      await target.save();
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Followed successfully", user: target });
+  } catch (err) {
+    res.status(500).json({ message: "Follow failed", error: err.message });
+  }
+});
+
+// ✅ UNFOLLOW a user
+router.patch("/users/:id/unfollow", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const targetId = req.params.id;
+
+    const user = await User.findOne({ userId });
+    const target = await User.findOne({ userId: targetId });
+
+    if (!user || !target) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    target.followers = target.followers.filter((id) => id !== userId);
+    user.following = user.following.filter((id) => id !== targetId);
+
+    await target.save();
+    await user.save();
+
+    res.status(200).json({ message: "Unfollowed successfully", user: target });
+  } catch (err) {
+    res.status(500).json({ message: "Unfollow failed", error: err.message });
   }
 });
 
