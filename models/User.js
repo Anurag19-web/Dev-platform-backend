@@ -9,7 +9,13 @@ const userSchema = new mongoose.Schema({
 
   bio:            { type: String, default: "" },
   skills:         { type: [String], default: [] },
-  experience:     { type: [String], default: [] },
+  experience: [
+  {
+    company: { type: String },
+    role: { type: String },
+    duration: { type: String },
+  }
+],
   github:         { type: String, default: "" },
   linkedin:       { type: String, default: "" },
   profilePicture: { type: String, default: "" },
