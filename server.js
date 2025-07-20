@@ -20,7 +20,7 @@ const allowedOrigins = [
   "https://dev-platform-frontend-qtfu.vercel.app" // Vercel deployed frontend
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -31,10 +31,21 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   credentials: true,
-}));
+};
 
-// ✅ Handle preflight requests (required for PATCH/PUT/DELETE CORS support)
-app.options("*", cors());
+// ✅ Apply CORS middleware
+app.use(cors(corsOptions));
+
+// ✅ Handle all OPTIONS requests manually (important!)
+app.options("*", (req, res) => {
+  res.set({
+    "Access-Control-Allow-Origin": req.headers.origin || "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
+    "Access-Control-Allow-Credentials": "true",
+  });
+  return res.sendStatus(200);
+});
 
 // ✅ Middleware
 app.use(express.json());
