@@ -16,6 +16,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+
 // ✅ Update profile data
 router.patch("/users/:id", async (req, res) => {
   try {
@@ -32,6 +33,7 @@ router.patch("/users/:id", async (req, res) => {
     res.status(500).json({ message: "Update error", error: error.message });
   }
 });
+
 
 // ✅ Upload profile picture
 router.patch("/users/:id/profile-picture", upload.single("profilePicture"), async (req, res) => {
@@ -56,8 +58,8 @@ router.patch("/users/:id/profile-picture", upload.single("profilePicture"), asyn
 // ✅ FOLLOW a user
 router.patch("/users/:id/follow", async (req, res) => {
   try {
-    const { userId } = req.body; // logged-in user
-    const targetId = req.params.id; // user to follow
+    const { userId } = req.body; // Logged-in user ID
+    const targetId = req.params.id; // User to follow
 
     if (userId === targetId) {
       return res.status(400).json({ message: "You cannot follow yourself" });
@@ -83,11 +85,16 @@ router.patch("/users/:id/follow", async (req, res) => {
   }
 });
 
+
 // ✅ UNFOLLOW a user
 router.patch("/users/:id/unfollow", async (req, res) => {
   try {
-    const { userId } = req.body;
-    const targetId = req.params.id;
+    const { userId } = req.body; // Logged-in user
+    const targetId = req.params.id; // User to unfollow
+
+    if (userId === targetId) {
+      return res.status(400).json({ message: "You cannot unfollow yourself" });
+    }
 
     const user = await User.findOne({ userId });
     const target = await User.findOne({ userId: targetId });
@@ -96,6 +103,7 @@ router.patch("/users/:id/unfollow", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Remove IDs from arrays
     target.followers = target.followers.filter((id) => id !== userId);
     user.following = user.following.filter((id) => id !== targetId);
 
