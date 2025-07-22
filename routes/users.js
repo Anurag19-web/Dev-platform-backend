@@ -57,14 +57,18 @@ router.patch("/users/:id/profile-picture", upload.single("profilePicture"), asyn
 
 // ✅ FOLLOW a user
 router.patch("/users/:id/follow", async (req, res) => {
+  const targetId = req.params.id;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ message: "Missing userId in request body" });
+  }
+
+  if (userId === targetId) {
+    return res.status(400).json({ message: "You cannot follow yourself" });
+  }
+
   try {
-    const { userId } = req.body; // Logged-in user ID
-    const targetId = req.params.id; // User to follow
-
-    if (userId === targetId) {
-      return res.status(400).json({ message: "You cannot follow yourself" });
-    }
-
     const user = await User.findOne({ userId });
     const target = await User.findOne({ userId: targetId });
 
@@ -72,14 +76,19 @@ router.patch("/users/:id/follow", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Avoid duplicates
     if (!target.followers.includes(userId)) {
       target.followers.push(userId);
       user.following.push(targetId);
+
       await target.save();
       await user.save();
     }
 
-    res.status(200).json({ message: "Followed successfully", user: target });
+    res.status(200).json({
+      message: "Followed successfully",
+      followers: target.followers,
+    });
   } catch (err) {
     res.status(500).json({ message: "Follow failed", error: err.message });
   }
@@ -88,14 +97,18 @@ router.patch("/users/:id/follow", async (req, res) => {
 
 // ✅ UNFOLLOW a user
 router.patch("/users/:id/unfollow", async (req, res) => {
+  const targetId = req.params.id;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ message: "Missing userId in request body" });
+  }
+
+  if (userId === targetId) {
+    return res.status(400).json({ message: "You cannot unfollow yourself" });
+  }
+
   try {
-    const { userId } = req.body; // Logged-in user
-    const targetId = req.params.id; // User to unfollow
-
-    if (userId === targetId) {
-      return res.status(400).json({ message: "You cannot unfollow yourself" });
-    }
-
     const user = await User.findOne({ userId });
     const target = await User.findOne({ userId: targetId });
 
@@ -103,14 +116,16 @@ router.patch("/users/:id/unfollow", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Remove IDs from arrays
     target.followers = target.followers.filter((id) => id !== userId);
     user.following = user.following.filter((id) => id !== targetId);
 
     await target.save();
     await user.save();
 
-    res.status(200).json({ message: "Unfollowed successfully", user: target });
+    res.status(200).json({
+      message: "Unfollowed successfully",
+      followers: target.followers,
+    });
   } catch (err) {
     res.status(500).json({ message: "Unfollow failed", error: err.message });
   }
