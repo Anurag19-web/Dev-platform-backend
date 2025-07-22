@@ -131,4 +131,22 @@ router.patch("/users/:id/unfollow", async (req, res) => {
   }
 });
 
+// ✅ GET followers and following together
+router.get("/users/:id/network", async (req, res) => {
+  try {
+    const user = await User.findOne({ userId: req.params.id });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const followers = await User.find({ userId: { $in: user.followers } })
+      .select("userId username email profilePicture");
+
+    const following = await User.find({ userId: { $in: user.following } })
+      .select("userId username email profilePicture");
+
+    res.status(200).json({ followers, following });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch network", error: error.message });
+  }
+});
+
 export default router;
