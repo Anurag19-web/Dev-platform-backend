@@ -60,8 +60,9 @@ router.patch("/users/:id/follow", async (req, res) => {
   const targetId = req.params.id;
   const { userId } = req.body;
 
-  if (!userId) {
-    return res.status(400).json({ message: "Missing userId in request body" });
+  // ✅ Stronger userId validation
+  if (!userId || typeof userId !== "string" || userId.trim() === "" || userId === "null" || userId === "undefined") {
+    return res.status(400).json({ message: "Invalid userId in request body" });
   }
 
   if (userId === targetId) {
@@ -69,6 +70,7 @@ router.patch("/users/:id/follow", async (req, res) => {
   }
 
   try {
+    // ✅ Find both users
     const user = await User.findOne({ userId });
     const target = await User.findOne({ userId: targetId });
 
@@ -76,20 +78,25 @@ router.patch("/users/:id/follow", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Avoid duplicates
-    if (!target.followers.includes(userId)) {
-      // Before saving
-      target.followers = [...new Set([...target.followers, userId])];
-      user.following = [...new Set([...user.following, targetId])];
+    // ✅ Use MongoDB atomic $addToSet to avoid duplicates + nulls
+    await User.updateOne(
+      { userId: targetId },
+      { $addToSet: { followers: userId } }
+    );
 
-      await target.save();
-      await user.save();
-    }
+    await User.updateOne(
+      { userId },
+      { $addToSet: { following: targetId } }
+    );
+
+    // ✅ Return updated follower list
+    const updatedTarget = await User.findOne({ userId: targetId });
 
     res.status(200).json({
       message: "Followed successfully",
-      followers: target.followers,
+      followers: updatedTarget.followers,
     });
+
   } catch (err) {
     res.status(500).json({ message: "Follow failed", error: err.message });
   }
