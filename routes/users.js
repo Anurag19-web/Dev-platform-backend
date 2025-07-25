@@ -78,8 +78,9 @@ router.patch("/users/:id/follow", async (req, res) => {
 
     // Avoid duplicates
     if (!target.followers.includes(userId)) {
-      target.followers.push(userId);
-      user.following.push(targetId);
+      // Before saving
+      target.followers = [...new Set([...target.followers, userId])];
+      user.following = [...new Set([...user.following, targetId])];
 
       await target.save();
       await user.save();
@@ -138,10 +139,10 @@ router.get("/users/:id/network", async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const followers = await User.find({ userId: { $in: [...new Set(user.followers)] } })
-    .select("userId username email profilePicture");
+      .select("userId username email profilePicture");
 
     const following = await User.find({ userId: { $in: [...new Set(user.following)] } })
-    .select("userId username email profilePicture");
+      .select("userId username email profilePicture");
 
 
     res.status(200).json({ followers, following });
