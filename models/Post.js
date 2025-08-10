@@ -19,11 +19,15 @@ const postSchema = new mongoose.Schema({
   },
   comments: [
     {
-      userId: { type: String, ref: "User" },
-      text: String,
+      userId: { type: String, ref: "User", required: true },
+      text: { type: String, required: true },
       createdAt: { type: Date, default: Date.now }
     }
   ],
+  shares: {
+    type: [String], // userIds of people who shared
+    default: []
+  }
 }, { timestamps: true });
 
 export const Post = mongoose.model("Post", postSchema);
