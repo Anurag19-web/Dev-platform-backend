@@ -49,26 +49,30 @@ router.get("/", async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Optional: populate user data for likes and comments (replace userIds with user data)
+    // Populate user data for posts, likes, and comments safely
     const postsWithUserDetails = await Promise.all(posts.map(async (post) => {
       // Fetch user who created the post
       const user = await User.findById(post.userId).select("username avatar email").lean();
 
-      // Fetch user info for each like userId
+      // Safely map likes userIds to user details
       const likesWithUser = await Promise.all(
-        post.likes.map(async (userId) => {
+        (post.likes || []).map(async (userId) => {
           const u = await User.findById(userId).select("username avatar").lean();
-          return u ? { _id: userId, username: u.username, avatar: u.avatar } : { _id: userId, username: "Unknown", avatar: null };
+          return u
+            ? { _id: userId, username: u.username, avatar: u.avatar }
+            : { _id: userId, username: "Unknown", avatar: null };
         })
       );
 
-      // Fetch user info for each comment userId
+      // Safely map comments with user details
       const commentsWithUser = await Promise.all(
-        post.comments.map(async (comment) => {
+        (post.comments || []).map(async (comment) => {
           const u = await User.findById(comment.userId).select("username avatar").lean();
           return {
             ...comment,
-            user: u ? { _id: comment.userId, username: u.username, avatar: u.avatar } : { _id: comment.userId, username: "Unknown", avatar: null }
+            user: u
+              ? { _id: comment.userId, username: u.username, avatar: u.avatar }
+              : { _id: comment.userId, username: "Unknown", avatar: null }
           };
         })
       );
@@ -83,9 +87,11 @@ router.get("/", async (req, res) => {
 
     res.json({ posts: postsWithUserDetails });
   } catch (error) {
+    console.error("Error fetching posts:", error);
     res.status(500).json({ message: "Error fetching posts", error: error.message });
   }
 });
+
 
 // Like a post
 router.post("/:postId/like", async (req, res) => {
