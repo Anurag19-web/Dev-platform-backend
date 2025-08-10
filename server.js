@@ -10,6 +10,7 @@ import blogsApi from "./routes/BlogsApi.js";
 import signupApi from "./routes/signupApi.js";
 import loginApi from "./routes/loginApi.js";
 import userRoutes from "./routes/users.js";
+import postsRoutes from "./routes/posts.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +60,7 @@ app.use("/api", signupApi);       // Handles /api/signup
 app.use("/api", loginApi);        // Handles /api/login
 app.use("/", blogsApi);           // Handles blog-related routes
 app.use("/api", userRoutes);      // Handles user profile routes
+app.use("/api/posts", postsRoutes);
 
 // ✅ Serve static profile images
 app.use("/uploads", express.static("uploads"));
