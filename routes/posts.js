@@ -1,40 +1,42 @@
+// routes/posts.js
 import express from "express";
 import multer from "multer";
+import fs from "fs";
+import path from "path";
 import { Post } from "../models/Post.js";
-import User from "../models/User.js"; // Assuming you have User model
+import User from "../models/User.js";
 
 const router = express.Router();
 
-// Setup multer storage
+// Ensure "uploads" folder exists
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Setup multer
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"), // make sure uploads/ folder exists
+  destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + "-" + file.originalname);
+    // Only safe extension, no original name for security
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
   }
 });
 const upload = multer({ storage });
 
-// Create Post with optional image upload
+// --- Create Post (with optional image) ---
 router.post("/", upload.single("image"), async (req, res) => {
   try {
     const { userId, content } = req.body;
-
-    if (!content) {
-      return res.status(400).json({ message: "Content is required" });
-    }
+    if (!content) return res.status(400).json({ message: "Content is required" });
+    if (!userId) return res.status(400).json({ message: "userId is required" });
 
     let imagePath = null;
-    if (req.file) {
-      imagePath = `/uploads/${req.file.filename}`;
-    }
+    if (req.file) imagePath = `/uploads/${req.file.filename}`;
 
-    const newPost = new Post({
-      userId,
-      content,
-      image: imagePath,
-    });
-
+    const newPost = new Post({ userId, content, image: imagePath });
     await newPost.save();
     res.status(201).json({ message: "Post created successfully", post: newPost });
   } catch (error) {
@@ -42,57 +44,48 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
-// Get all posts
+// --- Get All Posts (with user, likes, comments user info) ---
 router.get("/", async (req, res) => {
   try {
-    const posts = await Post.find()
-      .sort({ createdAt: -1 })
-      .lean();
+    // Find posts newest first
+    const posts = await Post.find().sort({ createdAt: -1 }).lean();
 
-    // Populate user data for posts, likes, and comments safely
-    const postsWithUserDetails = await Promise.all(posts.map(async (post) => {
-      // Fetch user who created the post using findOne (string _id)
-      const user = await User.findOne({ _id: post.userId }).select("username avatar email").lean();
+    // Get all related userIds
+    const userIds = [
+      ...new Set([
+        ...posts.map(p => p.userId),
+        ...posts.flatMap(p => p.likes),
+        ...posts.flatMap(p => (p.comments || []).map(c => c.userId))
+      ])
+    ];
 
-      // Safely map likes userIds to user details
-      const likesWithUser = await Promise.all(
-        (post.likes || []).map(async (userId) => {
-          const u = await User.findOne({ _id: userId }).select("username avatar").lean();
-          return u
-            ? { _id: userId, username: u.username, avatar: u.avatar }
-            : { _id: userId, username: "Unknown", avatar: null };
-        })
-      );
+    // Get all users at once (for fast mapping)
+    const users = await User.find({ userId: { $in: userIds } }).select("userId username profilePicture email").lean();
+    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
 
-      // Safely map comments with user details
-      const commentsWithUser = await Promise.all(
-        (post.comments || []).map(async (comment) => {
-          const u = await User.findOne({ _id: comment.userId }).select("username avatar").lean();
-          return {
-            ...comment,
-            user: u
-              ? { _id: comment.userId, username: u.username, avatar: u.avatar }
-              : { _id: comment.userId, username: "Unknown", avatar: null }
-          };
-        })
-      );
+    // Attach user info to each post/like/comment
+    const postsWithDetails = posts.map(post => {
+      const user = userMap[post.userId] || { userId: post.userId, username: "Unknown", profilePicture: null, email: "" };
+      const likes = (post.likes || []).map(uid => {
+        const u = userMap[uid];
+        return u ? { userId: uid, username: u.username, profilePicture: u.profilePicture } : { userId: uid, username: "Unknown", profilePicture: null };
+      });
+      const comments = (post.comments || []).map(c => ({
+        ...c,
+        user: userMap[c.userId]
+          ? { userId: c.userId, username: userMap[c.userId].username, profilePicture: userMap[c.userId].profilePicture }
+          : { userId: c.userId, username: "Unknown", profilePicture: null }
+      }));
+      return { ...post, user, likes, comments };
+    });
 
-      return {
-        ...post,
-        user,
-        likes: likesWithUser,
-        comments: commentsWithUser,
-      };
-    }));
-
-    res.json({ posts: postsWithUserDetails });
+    res.json({ posts: postsWithDetails });
   } catch (error) {
-    console.error("Error fetching posts:", error);
     res.status(500).json({ message: "Error fetching posts", error: error.message });
   }
 });
 
-// Like a post
+// --- Like a Post ---
 router.post("/:postId/like", async (req, res) => {
   try {
     const { userId } = req.body;
@@ -102,7 +95,6 @@ router.post("/:postId/like", async (req, res) => {
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Add userId to likes array if not already there
     if (!post.likes.includes(userId)) {
       post.likes.push(userId);
       await post.save();
@@ -113,7 +105,7 @@ router.post("/:postId/like", async (req, res) => {
   }
 });
 
-// Unlike a post
+// --- Unlike a Post ---
 router.post("/:postId/unlike", async (req, res) => {
   try {
     const { userId } = req.body;
@@ -123,7 +115,6 @@ router.post("/:postId/unlike", async (req, res) => {
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Remove userId from likes array if present
     post.likes = post.likes.filter(id => id !== userId);
     await post.save();
 
@@ -133,7 +124,7 @@ router.post("/:postId/unlike", async (req, res) => {
   }
 });
 
-// Add a comment
+// --- Add a Comment ---
 router.post("/:postId/comment", async (req, res) => {
   try {
     const { userId, text } = req.body;
@@ -152,33 +143,37 @@ router.post("/:postId/comment", async (req, res) => {
   }
 });
 
-// Get single post with populated likes and comments users
+// --- Get Single Post w/ User & Likes/Comments User Info ---
 router.get("/:postId", async (req, res) => {
   try {
     const { postId } = req.params;
     const post = await Post.findById(postId).lean();
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const user = await User.findOne({ _id: post.userId }).select("username avatar email").lean();
+    // Gather related userIds
+    const ids = [
+      post.userId,
+      ...(post.likes || []),
+      ...(post.comments || []).map(c => c.userId)
+    ];
 
-    const likesWithUser = await Promise.all(
-      (post.likes || []).map(async (userId) => {
-        const u = await User.findOne({ _id: userId }).select("username avatar").lean();
-        return u ? { _id: userId, username: u.username, avatar: u.avatar } : { _id: userId, username: "Unknown", avatar: null };
-      })
-    );
+    // Pull all users in 1 query
+    const users = await User.find({ userId: { $in: ids } }).select("userId username profilePicture email").lean();
+    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
 
-    const commentsWithUser = await Promise.all(
-      (post.comments || []).map(async (comment) => {
-        const u = await User.findOne({ _id: comment.userId }).select("username avatar").lean();
-        return {
-          ...comment,
-          user: u ? { _id: comment.userId, username: u.username, avatar: u.avatar } : { _id: comment.userId, username: "Unknown", avatar: null }
-        };
-      })
-    );
+    const user = userMap[post.userId] || { userId: post.userId, username: "Unknown", profilePicture: null, email: "" };
+    const likes = (post.likes || []).map(uid => {
+      const u = userMap[uid];
+      return u ? { userId: uid, username: u.username, profilePicture: u.profilePicture } : { userId: uid, username: "Unknown", profilePicture: null };
+    });
+    const comments = (post.comments || []).map(c => ({
+      ...c,
+      user: userMap[c.userId]
+        ? { userId: c.userId, username: userMap[c.userId].username, profilePicture: userMap[c.userId].profilePicture }
+        : { userId: c.userId, username: "Unknown", profilePicture: null }
+    }));
 
-    res.json({ ...post, user, likes: likesWithUser, comments: commentsWithUser });
+    res.json({ ...post, user, likes, comments });
   } catch (error) {
     res.status(500).json({ message: "Error fetching post", error: error.message });
   }
