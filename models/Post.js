@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const postSchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: String,
     ref: "User",
     required: true
   },
@@ -19,7 +19,7 @@ const postSchema = new mongoose.Schema({
   },
   comments: [
     {
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      userId: { type: String, ref: "User" },
       text: String,
       createdAt: { type: Date, default: Date.now }
     }
