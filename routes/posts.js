@@ -124,6 +124,23 @@ router.post("/:postId/unlike", async (req, res) => {
   }
 });
 
+router.get("/:postId/likes", async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const post = await Post.findById(postId).lean();
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const users = await User.find({ userId: { $in: post.likes } })
+      .select("userId username profilePicture")
+      .lean();
+
+    res.json({ likes: users });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching likes", error: error.message });
+  }
+});
+
+
 // --- Add a Comment ---
 router.post("/:postId/comment", async (req, res) => {
   try {
