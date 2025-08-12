@@ -168,42 +168,42 @@ router.post("/:postId/comment", async (req, res) => {
 });
 
 /* ---------------- DELETE COMMENT ---------------- */
-// DELETE comment
 router.delete("/:postId/comment/:commentId", async (req, res) => {
+  const { postId, commentId } = req.params;
+  const userId = req.query.userId;
+
+  console.log("postId", postId);
+  console.log("commentId", commentId);
+  console.log("userId", userId);
+
   try {
-    const { postId, commentId } = req.params;
-    const userId = req.query.userId; // userId passed as query param
-
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
-
     const post = await Post.findById(postId);
+    console.log("found post", post ? true : false);
+    console.log("found comment", post?.comments.id(commentId) ? true : false);
+
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      return res.status(404).json({ error: "Post not found" });
     }
 
-    // Find comment
     const comment = post.comments.id(commentId);
     if (!comment) {
-      return res.status(404).json({ message: "Comment not found" });
+      return res.status(404).json({ error: "Comment not found" });
     }
 
-    // Optional: allow only comment owner to delete
     if (comment.userId !== userId) {
-      return res.status(403).json({ message: "You can only delete your own comment" });
+      return res.status(403).json({ error: "Not authorized to delete this comment" });
     }
 
-    // Remove comment
     comment.deleteOne();
-
     await post.save();
+    res.json({ message: "Comment deleted" });
 
-    res.json({ message: "Comment deleted", comments: post.comments });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting comment", error: error.message });
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /* ---------------- GET SINGLE POST ---------------- */
 router.get("/:postId", async (req, res) => {
