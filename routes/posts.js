@@ -168,7 +168,6 @@ router.post("/:postId/comment", async (req, res) => {
 });
 
 /* ---------------- DELETE COMMENT ---------------- */
-// DELETE COMMENT
 router.delete("/:postId/comment/:commentId", async (req, res) => {
   const { postId, commentId } = req.params;
   const userId = req.query.userId; // ?userId=xxx
@@ -178,38 +177,42 @@ router.delete("/:postId/comment/:commentId", async (req, res) => {
   }
 
   try {
-    // 1. Find post
     const post = await Post.findById(postId);
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    // 2. Find comment
     const comment = post.comments.id(commentId);
     if (!comment) {
       return res.status(404).json({ error: "Comment not found" });
     }
 
-    // 3. Authorization check (handle both String & ObjectId cases)
     if (comment.userId.toString() !== userId.toString()) {
       return res.status(403).json({ error: "Not authorized to delete this comment" });
     }
 
-    // 4. Remove comment
-    comment.deleteOne(); // Mongoose subdocument removal
-
-    // 5. Save post
+    comment.deleteOne(); // remove subdocument
     await post.save();
 
-    res.json({ message: "Comment deleted successfully" });
+    // Fetch users to add user info to comments
+    const userIds = [...new Set(post.comments.map(c => c.userId.toString()))];
+    const users = await User.find({ userId: { $in: userIds } }).select("userId username profilePicture").lean();
+    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
+
+    const commentsWithUsers = post.comments.map(c => ({
+      ...c.toObject(),
+      user: userMap[c.userId]
+        ? { userId: c.userId, username: userMap[c.userId].username, profilePicture: userMap[c.userId].profilePicture }
+        : { userId: c.userId, username: "Unknown", profilePicture: null }
+    }));
+
+    res.json({ message: "Comment deleted successfully", comments: commentsWithUsers });
 
   } catch (error) {
     console.error("Delete comment error:", error.stack);
     res.status(500).json({ error: "Server error" });
   }
 });
-
-
 
 /* ---------------- GET SINGLE POST ---------------- */
 router.get("/:postId", async (req, res) => {
