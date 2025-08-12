@@ -126,24 +126,39 @@ router.post("/:postId/comment", async (req, res) => {
   try {
     const { userId, text } = req.body;
     const { postId } = req.params;
-    if (!userId || !text) return res.status(400).json({ message: "userId and text are required" });
+
+    if (!userId || !text) {
+      return res.status(400).json({ message: "userId and text are required" });
+    }
+
+    // Find user to get username
+    const user = await User.findOne({ userId }).select("username profilePicture");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
-    post.comments.push({ userId, text });
+    // Store username inside the comment
+    post.comments.push({
+      userId,
+      username: user.username,
+      text
+    });
+
     await post.save();
 
     // Return comments with user info
-    const userIds = post.comments.map(c => c.userId);
-    const users = await User.find({ userId: { $in: userIds } })
-      .select("userId username profilePicture")
-      .lean();
-    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
-
     const commentsWithUsers = post.comments.map(c => ({
       ...c.toObject(),
-      user: userMap[c.userId] || { userId: c.userId, username: "Unknown", profilePicture: null }
+      user: {
+        userId: c.userId,
+        username: c.username, // Already stored
+        profilePicture: userId === c.userId ? user.profilePicture : null
+      }
     }));
 
     res.json({ message: "Comment added", comments: commentsWithUsers });
