@@ -172,7 +172,7 @@ router.post("/:postId/comment", async (req, res) => {
 router.delete("/:postId/comment/:commentId", async (req, res) => {
   try {
     const { postId, commentId } = req.params;
-    const { userId } = req.query; // userId passed as query param
+    const userId = req.query.userId; // userId passed as query param
 
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
