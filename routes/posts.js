@@ -160,9 +160,12 @@ router.post("/:postId/comment", async (req, res) => {
   }
 });
 
-router.delete("/posts/:postId/comment/:commentId", async (req, res) => {
+// DELETE /api/posts/:postId/comment/:commentId
+router.delete("/:postId/comment/:commentId", async (req, res) => {
   const { postId, commentId } = req.params;
-  const { userId } = req.body;
+  const userId = req.body?.userId || req.query?.userId;
+
+  if (!userId) return res.status(400).json({ error: "userId required" });
 
   try {
     const post = await Post.findById(postId);
@@ -171,20 +174,20 @@ router.delete("/posts/:postId/comment/:commentId", async (req, res) => {
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ error: "Comment not found" });
 
-    // Allow delete only if the comment belongs to the logged-in user
-    if (comment.user.userId !== userId) {
+    // comment structure: { _id, userId, text, ... }
+    if (String(comment.userId) !== String(userId)) {
       return res.status(403).json({ error: "Not authorized" });
     }
 
     comment.remove();
     await post.save();
 
-    res.json({ comments: post.comments });
+    // Return comments (lean, or full subdocs)
+    res.json({ message: "Comment deleted", comments: post.comments });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // --- Get Single Post w/ User & Likes/Comments User Info ---
 router.get("/:postId", async (req, res) => {
