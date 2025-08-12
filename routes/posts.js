@@ -14,19 +14,18 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Setup multer
+// Multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    // Only safe extension, no original name for security
     const ext = path.extname(file.originalname);
     cb(null, uniqueSuffix + ext);
   }
 });
 const upload = multer({ storage });
 
-// --- Create Post (with optional image) ---
+/* ---------------- CREATE POST ---------------- */
 router.post("/", upload.single("image"), async (req, res) => {
   try {
     const { userId, content } = req.body;
@@ -38,19 +37,18 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     const newPost = new Post({ userId, content, image: imagePath });
     await newPost.save();
+
     res.status(201).json({ message: "Post created successfully", post: newPost });
   } catch (error) {
     res.status(500).json({ message: "Error creating post", error: error.message });
   }
 });
 
-// --- Get All Posts (with user, likes, comments user info) ---
+/* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
   try {
-    // Find posts newest first
     const posts = await Post.find().sort({ createdAt: -1 }).lean();
 
-    // Get all related userIds
     const userIds = [
       ...new Set([
         ...posts.map(p => p.userId),
@@ -59,11 +57,11 @@ router.get("/", async (req, res) => {
       ])
     ];
 
-    // Get all users at once (for fast mapping)
-    const users = await User.find({ userId: { $in: userIds } }).select("userId username profilePicture email").lean();
+    const users = await User.find({ userId: { $in: userIds } })
+      .select("userId username profilePicture email")
+      .lean();
     const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
 
-    // Attach user info to each post/like/comment
     const postsWithDetails = posts.map(post => {
       const user = userMap[post.userId] || { userId: post.userId, username: "Unknown", profilePicture: null, email: "" };
       const likes = (post.likes || []).map(uid => {
@@ -85,7 +83,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// --- Like a Post ---
+/* ---------------- LIKE / UNLIKE ---------------- */
 router.post("/:postId/like", async (req, res) => {
   try {
     const { userId } = req.body;
@@ -105,7 +103,6 @@ router.post("/:postId/like", async (req, res) => {
   }
 });
 
-// --- Unlike a Post ---
 router.post("/:postId/unlike", async (req, res) => {
   try {
     const { userId } = req.body;
@@ -124,24 +121,7 @@ router.post("/:postId/unlike", async (req, res) => {
   }
 });
 
-router.get("/:postId/likes", async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const post = await Post.findById(postId).lean();
-    if (!post) return res.status(404).json({ message: "Post not found" });
-
-    const users = await User.find({ userId: { $in: post.likes } })
-      .select("userId username profilePicture")
-      .lean();
-
-    res.json({ likes: users });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching likes", error: error.message });
-  }
-});
-
-
-// --- Add a Comment ---
+/* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
     const { userId, text } = req.body;
@@ -154,16 +134,28 @@ router.post("/:postId/comment", async (req, res) => {
     post.comments.push({ userId, text });
     await post.save();
 
-    res.json({ message: "Comment added", comments: post.comments });
+    // Return comments with user info
+    const userIds = post.comments.map(c => c.userId);
+    const users = await User.find({ userId: { $in: userIds } })
+      .select("userId username profilePicture")
+      .lean();
+    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
+
+    const commentsWithUsers = post.comments.map(c => ({
+      ...c.toObject(),
+      user: userMap[c.userId] || { userId: c.userId, username: "Unknown", profilePicture: null }
+    }));
+
+    res.json({ message: "Comment added", comments: commentsWithUsers });
   } catch (error) {
     res.status(500).json({ message: "Error adding comment", error: error.message });
   }
 });
 
-// DELETE /api/posts/:postId/comment/:commentId
+/* ---------------- DELETE COMMENT ---------------- */
 router.delete("/:postId/comment/:commentId", async (req, res) => {
   const { postId, commentId } = req.params;
-  const userId = req.body?.userId || req.query?.userId;
+  const userId = req.query.userId; // using query param for DELETE
 
   if (!userId) return res.status(400).json({ error: "userId required" });
 
@@ -174,7 +166,6 @@ router.delete("/:postId/comment/:commentId", async (req, res) => {
     const comment = post.comments.id(commentId);
     if (!comment) return res.status(404).json({ error: "Comment not found" });
 
-    // comment structure: { _id, userId, text, ... }
     if (String(comment.userId) !== String(userId)) {
       return res.status(403).json({ error: "Not authorized" });
     }
@@ -182,28 +173,37 @@ router.delete("/:postId/comment/:commentId", async (req, res) => {
     comment.remove();
     await post.save();
 
-    // Return comments (lean, or full subdocs)
-    res.json({ message: "Comment deleted", comments: post.comments });
+    // Return updated comments with user info
+    const userIds = post.comments.map(c => c.userId);
+    const users = await User.find({ userId: { $in: userIds } })
+      .select("userId username profilePicture")
+      .lean();
+    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
+
+    const commentsWithUsers = post.comments.map(c => ({
+      ...c.toObject(),
+      user: userMap[c.userId] || { userId: c.userId, username: "Unknown", profilePicture: null }
+    }));
+
+    res.json({ message: "Comment deleted", comments: commentsWithUsers });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// --- Get Single Post w/ User & Likes/Comments User Info ---
+/* ---------------- GET SINGLE POST ---------------- */
 router.get("/:postId", async (req, res) => {
   try {
     const { postId } = req.params;
     const post = await Post.findById(postId).lean();
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Gather related userIds
     const ids = [
       post.userId,
       ...(post.likes || []),
       ...(post.comments || []).map(c => c.userId)
     ];
 
-    // Pull all users in 1 query
     const users = await User.find({ userId: { $in: ids } }).select("userId username profilePicture email").lean();
     const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
 
