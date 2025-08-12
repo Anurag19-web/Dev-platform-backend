@@ -168,41 +168,47 @@ router.post("/:postId/comment", async (req, res) => {
 });
 
 /* ---------------- DELETE COMMENT ---------------- */
+// DELETE COMMENT
 router.delete("/:postId/comment/:commentId", async (req, res) => {
   const { postId, commentId } = req.params;
-  const userId = req.query.userId;
+  const userId = req.query.userId; // ?userId=xxx
 
-  console.log("postId", postId);
-  console.log("commentId", commentId);
-  console.log("userId", userId);
+  if (!userId) {
+    return res.status(400).json({ error: "userId required in query params" });
+  }
 
   try {
+    // 1. Find post
     const post = await Post.findById(postId);
-    console.log("found post", post ? true : false);
-    console.log("found comment", post?.comments.id(commentId) ? true : false);
-
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
 
+    // 2. Find comment
     const comment = post.comments.id(commentId);
     if (!comment) {
       return res.status(404).json({ error: "Comment not found" });
     }
 
-    if (comment.userId !== userId) {
+    // 3. Authorization check (handle both String & ObjectId cases)
+    if (comment.userId.toString() !== userId.toString()) {
       return res.status(403).json({ error: "Not authorized to delete this comment" });
     }
 
-    comment.deleteOne();
+    // 4. Remove comment
+    comment.deleteOne(); // Mongoose subdocument removal
+
+    // 5. Save post
     await post.save();
-    res.json({ message: "Comment deleted" });
+
+    res.json({ message: "Comment deleted successfully" });
 
   } catch (error) {
-    console.error(error);
+    console.error("Delete comment error:", error.stack);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 /* ---------------- GET SINGLE POST ---------------- */
