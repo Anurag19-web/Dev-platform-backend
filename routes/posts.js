@@ -160,6 +160,32 @@ router.post("/:postId/comment", async (req, res) => {
   }
 });
 
+router.delete("/posts/:postId/comment/:commentId", async (req, res) => {
+  const { postId, commentId } = req.params;
+  const { userId } = req.body;
+
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+
+    const comment = post.comments.id(commentId);
+    if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+    // Allow delete only if the comment belongs to the logged-in user
+    if (comment.user.userId !== userId) {
+      return res.status(403).json({ error: "Not authorized" });
+    }
+
+    comment.remove();
+    await post.save();
+
+    res.json({ comments: post.comments });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // --- Get Single Post w/ User & Likes/Comments User Info ---
 router.get("/:postId", async (req, res) => {
   try {
