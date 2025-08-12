@@ -168,41 +168,40 @@ router.post("/:postId/comment", async (req, res) => {
 });
 
 /* ---------------- DELETE COMMENT ---------------- */
+// DELETE comment
 router.delete("/:postId/comment/:commentId", async (req, res) => {
-  const { postId, commentId } = req.params;
-  const userId = req.query.userId; // using query param for DELETE
-
-  if (!userId) return res.status(400).json({ error: "userId required" });
-
   try {
-    const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ error: "Post not found" });
+    const { postId, commentId } = req.params;
+    const { userId } = req.query; // userId passed as query param
 
-    const comment = post.comments.id(commentId);
-    if (!comment) return res.status(404).json({ error: "Comment not found" });
-
-    if (String(comment.userId) !== String(userId)) {
-      return res.status(403).json({ error: "Not authorized" });
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
     }
 
-    comment.remove();
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Find comment
+    const comment = post.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    // Optional: allow only comment owner to delete
+    if (comment.userId !== userId) {
+      return res.status(403).json({ message: "You can only delete your own comment" });
+    }
+
+    // Remove comment
+    comment.deleteOne();
+
     await post.save();
 
-    // Return updated comments with user info
-    const userIds = post.comments.map(c => c.userId);
-    const users = await User.find({ userId: { $in: userIds } })
-      .select("userId username profilePicture")
-      .lean();
-    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
-
-    const commentsWithUsers = post.comments.map(c => ({
-      ...c.toObject(),
-      user: userMap[c.userId] || { userId: c.userId, username: "Unknown", profilePicture: null }
-    }));
-
-    res.json({ message: "Comment deleted", comments: commentsWithUsers });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.json({ message: "Comment deleted", comments: post.comments });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting comment", error: error.message });
   }
 });
 
