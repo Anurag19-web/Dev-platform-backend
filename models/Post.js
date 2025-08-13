@@ -6,6 +6,10 @@ const postSchema = new mongoose.Schema({
     ref: "User",
     required: true
   },
+  username: {
+    type: String, // username of the post creator
+    required: true,
+  },
   content: {
     type: String,
     required: true
@@ -20,7 +24,7 @@ const postSchema = new mongoose.Schema({
   comments: [
     {
       userId: { type: String, ref: "User", required: true },
-      username: { type: String, required: true},
+      username: { type: String, required: true },
       text: { type: String, required: true },
       createdAt: { type: Date, default: Date.now }
     }

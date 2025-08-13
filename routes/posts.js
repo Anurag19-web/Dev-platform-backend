@@ -32,10 +32,23 @@ router.post("/", upload.single("image"), async (req, res) => {
     if (!content) return res.status(400).json({ message: "Content is required" });
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
+    // Get the username of the post creator
+    const user = await User.findOne({ userId }).select("username");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     let imagePath = null;
     if (req.file) imagePath = `/uploads/${req.file.filename}`;
 
-    const newPost = new Post({ userId, content, image: imagePath });
+    // Add username to post
+    const newPost = new Post({
+      userId,
+      username: user.username, // NEW FIELD
+      content,
+      image: imagePath
+    });
+
     await newPost.save();
 
     res.status(201).json({ message: "Post created successfully", post: newPost });
@@ -124,11 +137,11 @@ router.post("/:postId/unlike", async (req, res) => {
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
-    const { userId, text, username } = req.body;
+    const { userId, text } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text || !username) {
-      return res.status(400).json({ message: "userId and text and username are required" });
+    if (!userId || !text ) {
+      return res.status(400).json({ message: "userId and text are required" });
     }
 
     // Find user to get username
