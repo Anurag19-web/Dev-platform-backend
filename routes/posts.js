@@ -32,8 +32,8 @@ router.post("/", upload.single("image"), async (req, res) => {
     if (!content) return res.status(400).json({ message: "Content is required" });
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
-    // Get the username of the post creator
-    const user = await User.findOne({ userId }).select("username");
+    // Fetch username from DB using _id
+    const user = await User.findById(userId).select("username");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -41,14 +41,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     let imagePath = null;
     if (req.file) imagePath = `/uploads/${req.file.filename}`;
 
-    // Add username to post
-    const newPost = new Post({
-      userId,
-      username: user.username, // NEW FIELD
-      content,
-      image: imagePath
-    });
-
+    const newPost = new Post({ userId, username: user.username, content, image: imagePath });
     await newPost.save();
 
     res.status(201).json({ message: "Post created successfully", post: newPost });
@@ -140,7 +133,7 @@ router.post("/:postId/comment", async (req, res) => {
     const { userId, text, username } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text || !username ) {
+    if (!userId || !text || !username) {
       return res.status(400).json({ message: "userId and text and username are required" });
     }
 
