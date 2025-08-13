@@ -137,11 +137,11 @@ router.post("/:postId/unlike", async (req, res) => {
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
-    const { userId, text } = req.body;
+    const { userId, text, username } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text ) {
-      return res.status(400).json({ message: "userId and text are required" });
+    if (!userId || !text || !username ) {
+      return res.status(400).json({ message: "userId and text and username are required" });
     }
 
     // Find user to get username
