@@ -127,6 +127,25 @@ router.post("/:postId/unlike", async (req, res) => {
   }
 });
 
+// GET /api/posts/:postId/likes
+router.get("/:postId/likes", async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    // Fetch users by custom userId since likes array stores userId now
+    const likedUsers = await User.find({ userId: { $in: post.likes } })
+      .select("userId username profilePicture");
+
+    res.json(likedUsers);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching liked users", error: error.message });
+  }
+});
+
+
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
