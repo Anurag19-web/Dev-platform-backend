@@ -33,7 +33,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
     // Fetch username from DB using _id
-    const user = await User.findById(userId).select("username");
+    const user = await User.findOne({ userId }).select("username");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
