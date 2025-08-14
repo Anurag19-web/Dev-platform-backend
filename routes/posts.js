@@ -89,6 +89,43 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/posts/user/:userId
+router.get("/user/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // Fetch all posts by the specified user
+    const posts = await Post.find({ userId }).sort({ createdAt: -1 }).lean();
+
+    // Optional: include likes and comments as stored
+    res.json({ posts });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user posts", error: error.message });
+  }
+});
+
+// DELETE /api/posts/:postId?userId=xxx
+router.delete("/:postId", async (req, res) => {
+  const { postId } = req.params;
+  const userId = req.query.userId; // passed as query
+
+  if (!userId) return res.status(400).json({ message: "userId is required in query" });
+
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    // Only owner can delete
+    if (post.userId !== userId) return res.status(403).json({ message: "Not authorized" });
+
+    await post.deleteOne();
+    res.json({ message: "Post deleted successfully", postId });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting post", error: error.message });
+  }
+});
+
+
 /* ---------------- LIKE / UNLIKE ---------------- */
 router.post("/:postId/like", async (req, res) => {
   try {
