@@ -1,5 +1,3 @@
-// server.js
-
 import dotenv from "dotenv";
 dotenv.config(); // ✅ Load environment variables
 
@@ -12,6 +10,7 @@ import loginApi from "./routes/loginApi.js";
 import userRoutes from "./routes/users.js";
 import postsRoutes from "./routes/posts.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import savePostRoutes from "./routes/savePost.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -63,6 +62,7 @@ app.use("/", blogsApi);           // Handles blog-related routes
 app.use("/api", userRoutes);      // Handles user profile routes
 app.use("/api/posts", postsRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api/save", savePostRoutes);
 
 // ✅ Serve static profile images
 app.use("/uploads", express.static("uploads"));

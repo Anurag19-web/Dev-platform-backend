@@ -21,6 +21,12 @@ const userSchema = new mongoose.Schema({
   profilePicture: { type: String, default: "" },
   followers:      { type: [String], default: [] },
   following:      { type: [String], default: [] },
+  savedPosts: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post"
+    }
+  ]
 }, { timestamps: true });
 
 const User = mongoose.model("User", userSchema);
