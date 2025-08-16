@@ -3,6 +3,8 @@ import express from "express";
 import multer from "multer";
 import { Post } from "../models/Post.js";
 import User from "../models/User.js";
+import { Readable } from "stream";
+import cloudinary from "../config/cloudinaryConfig.js";
 
 const router = express.Router();
 
