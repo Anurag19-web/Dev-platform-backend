@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { Post } from "../models/Post.js";
 import User from "../models/User.js";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
 const router = express.Router();
 
