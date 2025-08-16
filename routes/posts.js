@@ -1,28 +1,31 @@
 // routes/posts.js
 import express from "express";
 import multer from "multer";
-import fs from "fs";
-import path from "path";
 import { Post } from "../models/Post.js";
 import User from "../models/User.js";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
 
 const router = express.Router();
 
-// Multer + Cloudinary storage
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => {
-    return {
-      folder: "posts",
-      resource_type: file.mimetype.startsWith("image/") ? "image" : "raw",
-      format: file.mimetype.startsWith("image/") ? undefined : "pdf",
-      public_id: `${Date.now()}-${file.originalname}`,
-    };
-  },
-});
-
+// Multer memory storage
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+// Helper to upload buffer to Cloudinary
+const uploadToCloudinary = (buffer, folder, filename, resource_type = "auto") =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, public_id: filename, resource_type },
+      (err, result) => {
+        if (err) return reject(err);
+        resolve(result.secure_url);
+      }
+    );
+    const readable = new Readable();
+    readable._read = () => {};
+    readable.push(buffer);
+    readable.push(null);
+    readable.pipe(stream);
+  });
 
 /* ---------------- CREATE POST (multiple files) ---------------- */
 router.post("/", upload.array("files", 10), async (req, res) => {
@@ -36,19 +39,23 @@ router.post("/", upload.array("files", 10), async (req, res) => {
 
     let files = [];
     if (req.files && req.files.length > 0) {
-      files = req.files.map(f => f.path); // Cloudinary URLs
+      for (const file of req.files) {
+        const resource_type = file.mimetype.startsWith("image/") ? "image" : "raw";
+        const format = resource_type === "image" ? undefined : "pdf";
+        const url = await uploadToCloudinary(file.buffer, "posts", `${Date.now()}-${file.originalname}`, resource_type);
+        files.push(url);
+      }
     }
 
     const newPost = new Post({
       userId,
       username: user.username,
       content,
-      files, // array of Cloudinary URLs
+      files,
     });
 
     await newPost.save();
     res.status(201).json({ message: "Post created successfully", post: newPost });
-
   } catch (error) {
     console.error("Create post error:", error);
     res.status(500).json({ message: "Error creating post", error: error.message });
