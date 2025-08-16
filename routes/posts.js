@@ -16,18 +16,24 @@ const upload = multer({ storage });
 const uploadToCloudinary = (buffer, folder, filename, resource_type = "auto") =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, public_id: filename, resource_type },
+      {
+        folder,
+        public_id: filename,
+        resource_type,
+        flags: resource_type === "raw" ? "attachment:false" : undefined
+      },
       (err, result) => {
         if (err) return reject(err);
         resolve(result.secure_url);
       }
     );
     const readable = new Readable();
-    readable._read = () => {};
+    readable._read = () => { };
     readable.push(buffer);
     readable.push(null);
     readable.pipe(stream);
   });
+
 
 /* ---------------- CREATE POST (multiple files) ---------------- */
 router.post("/", upload.array("files", 10), async (req, res) => {
