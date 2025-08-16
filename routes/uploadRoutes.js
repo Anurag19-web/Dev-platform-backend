@@ -65,7 +65,13 @@ router.post("/upload-profile", upload.single("file"), async (req, res) => {
 
     if (!updatedUser) throw new Error("User not found");
 
-    res.json({ message: "Profile picture updated", user: updatedUser });
+    res.json({
+      message: "Profile picture updated",
+      url: result.secure_url, // <-- this is what frontend expects
+      public_id: result.public_id,
+      user: updatedUser,
+    });
+
   } catch (error) {
     console.error("Profile upload error:", error);
     res.status(500).json({ error: error.message });
