@@ -14,6 +14,10 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  documents: {
+    type: [String], // array of PDF/doc URLs
+    default: []
+  },
   image: {
     type: String, // optional image URL
   },

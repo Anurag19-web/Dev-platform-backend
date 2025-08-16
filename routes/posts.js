@@ -8,44 +8,48 @@ import User from "../models/User.js";
 
 const router = express.Router();
 
-// Ensure "uploads" folder exists
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, uniqueSuffix + ext);
-  }
+// Multer + Cloudinary storage
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    return {
+      folder: "posts",
+      resource_type: file.mimetype.startsWith("image/") ? "image" : "raw",
+      format: file.mimetype.startsWith("image/") ? undefined : "pdf",
+      public_id: `${Date.now()}-${file.originalname}`,
+    };
+  },
 });
+
 const upload = multer({ storage });
 
-/* ---------------- CREATE POST ---------------- */
-router.post("/", upload.single("image"), async (req, res) => {
+/* ---------------- CREATE POST (multiple files) ---------------- */
+router.post("/", upload.array("files", 10), async (req, res) => {
   try {
     const { userId, content } = req.body;
     if (!content) return res.status(400).json({ message: "Content is required" });
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
-    // Fetch username from DB using _id
     const user = await User.findOne({ userId }).select("username");
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    let files = [];
+    if (req.files && req.files.length > 0) {
+      files = req.files.map(f => f.path); // Cloudinary URLs
     }
 
-    let imagePath = null;
-    if (req.file) imagePath = `/uploads/${req.file.filename}`;
+    const newPost = new Post({
+      userId,
+      username: user.username,
+      content,
+      files, // array of Cloudinary URLs
+    });
 
-    const newPost = new Post({ userId, username: user.username, content, image: imagePath });
     await newPost.save();
-
     res.status(201).json({ message: "Post created successfully", post: newPost });
+
   } catch (error) {
+    console.error("Create post error:", error);
     res.status(500).json({ message: "Error creating post", error: error.message });
   }
 });
