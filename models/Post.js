@@ -18,8 +18,9 @@ const postSchema = new mongoose.Schema({
     type: [String], // array of PDF/doc URLs
     default: []
   },
-  image: {
-    type: String, // optional image URL
+  images: {
+    type: [String], // array of image URLs
+    default: []
   },
   likes: {
     type: [String], // userIds of people who liked

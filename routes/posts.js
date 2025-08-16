@@ -32,20 +32,31 @@ const uploadToCloudinary = (buffer, folder, filename, resource_type = "auto") =>
 /* ---------------- CREATE POST (multiple files) ---------------- */
 router.post("/", upload.array("files", 10), async (req, res) => {
   try {
-    const { userId, content } = req.body;
+    const { userId, content, visibility } = req.body;
     if (!content) return res.status(400).json({ message: "Content is required" });
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
     const user = await User.findOne({ userId }).select("username");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    let files = [];
+    let images = [];
+    let documents = [];
+
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         const resource_type = file.mimetype.startsWith("image/") ? "image" : "raw";
-        const format = resource_type === "image" ? undefined : "pdf";
-        const url = await uploadToCloudinary(file.buffer, "posts", `${Date.now()}-${file.originalname}`, resource_type);
-        files.push(url);
+        const url = await uploadToCloudinary(
+          file.buffer,
+          "posts",
+          `${Date.now()}-${file.originalname}`,
+          resource_type
+        );
+
+        if (resource_type === "image") {
+          images.push(url); // store latest uploaded images
+        } else {
+          documents.push(url); // store PDF/docs in array
+        }
       }
     }
 
@@ -53,7 +64,9 @@ router.post("/", upload.array("files", 10), async (req, res) => {
       userId,
       username: user.username,
       content,
-      files,
+      images,
+      documents,
+      // likes, comments, shares will default to empty arrays
     });
 
     await newPost.save();
@@ -63,6 +76,7 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     res.status(500).json({ message: "Error creating post", error: error.message });
   }
 });
+
 
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
