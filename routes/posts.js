@@ -19,7 +19,7 @@ const uploadToCloudinary = (buffer, folder, filename) =>
       {
         folder,
         public_id: filename,
-        resource_type: "auto",   // auto-detects image, video, raw (pdf/docx/zip)
+        resource_type,  // auto-detects image, video, raw (pdf/docx/zip)
         flags: "attachment:false" // lets browser open instead of download
       },
       (err, result) => {
@@ -29,7 +29,7 @@ const uploadToCloudinary = (buffer, folder, filename) =>
     );
 
     const readable = new Readable();
-    readable._read = () => {};
+    readable._read = () => { };
     readable.push(buffer);
     readable.push(null);
     readable.pipe(stream);
@@ -72,7 +72,6 @@ router.post("/", upload.array("files", 10), async (req, res) => {
       content,
       images,
       documents,
-      // likes, comments, shares will default to empty arrays
     });
 
     await newPost.save();
@@ -82,7 +81,6 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     res.status(500).json({ message: "Error creating post", error: error.message });
   }
 });
-
 
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
@@ -159,7 +157,6 @@ router.delete("/:postId", async (req, res) => {
   }
 });
 
-
 /* ---------------- LIKE / UNLIKE ---------------- */
 router.post("/:postId/like", async (req, res) => {
   try {
@@ -215,7 +212,6 @@ router.get("/:postId/likes", async (req, res) => {
     res.status(500).json({ message: "Error fetching liked users", error: error.message });
   }
 });
-
 
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
