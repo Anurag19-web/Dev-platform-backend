@@ -64,9 +64,9 @@ router.post("/", upload.array("files", 10), async (req, res) => {
         );
 
         if (resource_type === "image") {
-          images.push({ url });
+          images.push({ url, downloadUrl: url });
         } else {
-          documents.push({ url });
+          documents.push({ url, downloadUrl: url });
         }
       }
     }
@@ -96,7 +96,12 @@ router.get("/:postId/download/:docIndex", async (req, res) => {
     const doc = post.documents[docIndex];
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
-    res.redirect(doc.url);
+    // Force download in browser
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=document_${docIndex + 1}.pdf`
+    );
+    res.redirect(doc.downloadUrl);
   } catch (err) {
     res.status(500).json({ message: "Error downloading file", error: err.message });
   }
