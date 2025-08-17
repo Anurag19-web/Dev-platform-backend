@@ -13,26 +13,31 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // Helper to upload buffer to Cloudinary
-const uploadToCloudinary = (buffer, folder, filename, resource_type) =>
+const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =>
   new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        public_id: filename,
-        resource_type,  // auto-detects image, video, raw (pdf/docx/zip)
-      },
-      (err, result) => {
-        if (err) return reject(err);
-        resolve(result.secure_url);
-      }
-    );
+    const options = {
+      folder,
+      public_id: filename.replace(/\.[^/.]+$/, ""), // strip ext
+      resource_type,
+    };
+
+    // Force proper extension for PDFs
+    if (resource_type === "raw" && mimetype === "application/pdf") {
+      options.format = "pdf"; 
+    }
+
+    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
+      if (err) return reject(err);
+      resolve(result.secure_url);
+    });
 
     const readable = new Readable();
-    readable._read = () => { };
+    readable._read = () => {};
     readable.push(buffer);
     readable.push(null);
     readable.pipe(stream);
   });
+
 
 /* ---------------- CREATE POST (multiple files) ---------------- */
 router.post("/", upload.array("files", 10), async (req, res) => {
@@ -54,7 +59,8 @@ router.post("/", upload.array("files", 10), async (req, res) => {
           file.buffer,
           "posts",
           `${Date.now()}-${file.originalname}`,
-          resource_type
+          resource_type,
+          file.mimetype
         );
 
         if (resource_type === "image") {
