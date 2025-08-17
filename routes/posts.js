@@ -63,17 +63,10 @@ router.post("/", upload.array("files", 10), async (req, res) => {
           file.mimetype
         );
 
-        // Force download with filename
-        const fileName = file.originalname;
-        let downloadUrl = url.replace(
-          "/upload/",
-          `/upload/fl_attachment:${fileName}/`
-        );
-
         if (resource_type === "image") {
-          images.push({ url, downloadUrl });
+          images.push({ url });
         } else {
-          documents.push({ url, downloadUrl });
+          documents.push({ url });
         }
       }
     }
@@ -103,12 +96,11 @@ router.get("/:postId/download/:docIndex", async (req, res) => {
     const doc = post.documents[docIndex];
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
-    res.redirect(doc.downloadUrl);
+    res.redirect(doc.url);
   } catch (err) {
     res.status(500).json({ message: "Error downloading file", error: err.message });
   }
 });
-
 
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
