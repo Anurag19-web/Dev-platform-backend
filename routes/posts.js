@@ -99,16 +99,20 @@ router.get("/:postId/download/:docIndex", async (req, res) => {
     const doc = post.documents[docIndex];
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
-    // Force browser download
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=document_${docIndex + 1}.pdf`
-    );
+    // Use Cloudinary API to generate signed URL for private PDFs
+    const publicId = doc.url.split("/").pop().split(".")[0]; // get publicId from URL
+    const signedUrl = cloudinary.url(publicId, {
+      resource_type: "raw",
+      sign_url: true,
+      type: "upload",
+      expires_at: Math.floor(Date.now() / 1000) + 300, // valid for 5 mins
+    });
 
-    // Choose protocol
-    const client = doc.downloadUrl.startsWith("https") ? https : http;
+    // Force download
+    res.setHeader("Content-Disposition", `attachment; filename=document_${docIndex + 1}.pdf`);
 
-    client.get(doc.downloadUrl, (cloudRes) => {
+    const client = signedUrl.startsWith("https") ? https : http;
+    client.get(signedUrl, (cloudRes) => {
       if (cloudRes.statusCode !== 200) {
         return res.status(cloudRes.statusCode).send("Failed to fetch PDF");
       }
