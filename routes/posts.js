@@ -13,14 +13,13 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // Helper to upload buffer to Cloudinary
-const uploadToCloudinary = (buffer, folder, filename) =>
+const uploadToCloudinary = (buffer, folder, filename, resource_type) =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder,
         public_id: filename,
         resource_type,  // auto-detects image, video, raw (pdf/docx/zip)
-        flags: "attachment:false" // lets browser open instead of download
       },
       (err, result) => {
         if (err) return reject(err);
