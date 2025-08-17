@@ -14,14 +14,18 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  documents: {
-    type: [String], // array of PDF/doc URLs
-    default: []
-  },
-  images: {
-    type: [String], // array of image URLs
-    default: []
-  },
+  documents: [
+    {
+      url: { type: String, required: true },
+      downloadUrl: { type: String, required: true }
+    }
+  ],
+  images: [
+    {
+      url: { type: String, required: true },
+      downloadUrl: { type: String, required: true }
+    }
+  ],
   likes: {
     type: [String], // userIds of people who liked
     default: []

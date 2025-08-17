@@ -23,7 +23,7 @@ const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =
 
     // Force proper extension for PDFs
     if (resource_type === "raw" && mimetype === "application/pdf") {
-      options.format = "pdf"; 
+      options.format = "pdf";
     }
 
     const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
@@ -32,7 +32,7 @@ const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =
     });
 
     const readable = new Readable();
-    readable._read = () => {};
+    readable._read = () => { };
     readable.push(buffer);
     readable.push(null);
     readable.pipe(stream);
@@ -63,10 +63,17 @@ router.post("/", upload.array("files", 10), async (req, res) => {
           file.mimetype
         );
 
+        // Force download with filename
+        const fileName = file.originalname;
+        let downloadUrl = url.replace(
+          "/upload/",
+          `/upload/fl_attachment:${fileName}/`
+        );
+
         if (resource_type === "image") {
-          images.push(url); // store latest uploaded images
+          images.push({ url, downloadUrl });
         } else {
-          documents.push(url); // store PDF/docs in array
+          documents.push({ url, downloadUrl });
         }
       }
     }
@@ -86,6 +93,22 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     res.status(500).json({ message: "Error creating post", error: error.message });
   }
 });
+
+router.get("/:postId/download/:docIndex", async (req, res) => {
+  try {
+    const { postId, docIndex } = req.params;
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const doc = post.documents[docIndex];
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    res.redirect(doc.downloadUrl);
+  } catch (err) {
+    res.status(500).json({ message: "Error downloading file", error: err.message });
+  }
+});
+
 
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
