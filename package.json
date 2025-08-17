@@ -7,11 +7,14 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "and": "^0.0.3",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
+    "http": "^0.0.1-security",
+    "https": "^1.0.0",
     "mongodb": "^6.17.0",
     "mongoose": "^8.16.4",
     "multer": "^2.0.2",

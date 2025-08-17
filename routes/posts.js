@@ -5,6 +5,8 @@ import { Post } from "../models/Post.js";
 import User from "../models/User.js";
 import { Readable } from "stream";
 import cloudinary from "../config/cloudinaryConfig.js";
+import https from "https";
+import http from "http";
 
 const router = express.Router();
 
@@ -19,6 +21,7 @@ const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =
       folder,
       public_id: filename.replace(/\.[^/.]+$/, ""), // strip ext
       resource_type,
+      type: "upload", // this makes it public
     };
 
     // Force proper extension for PDFs
@@ -96,12 +99,24 @@ router.get("/:postId/download/:docIndex", async (req, res) => {
     const doc = post.documents[docIndex];
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
-    // Force download in browser
+    // Force browser download
     res.setHeader(
-      'Content-Disposition',
+      "Content-Disposition",
       `attachment; filename=document_${docIndex + 1}.pdf`
     );
-    res.redirect(doc.downloadUrl);
+
+    // Choose protocol
+    const client = doc.downloadUrl.startsWith("https") ? https : http;
+
+    client.get(doc.downloadUrl, (cloudRes) => {
+      if (cloudRes.statusCode !== 200) {
+        return res.status(cloudRes.statusCode).send("Failed to fetch PDF");
+      }
+      cloudRes.pipe(res);
+    }).on("error", (err) => {
+      res.status(500).json({ message: "Error downloading file", error: err.message });
+    });
+
   } catch (err) {
     res.status(500).json({ message: "Error downloading file", error: err.message });
   }
