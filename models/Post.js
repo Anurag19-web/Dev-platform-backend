@@ -14,12 +14,6 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  documents: [
-    {
-      url: { type: String, required: true },
-      downloadUrl: { type: String, required: true }
-    }
-  ],
   images: [
     {
       url: { type: String, required: true },

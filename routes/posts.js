@@ -5,8 +5,6 @@ import { Post } from "../models/Post.js";
 import User from "../models/User.js";
 import { Readable } from "stream";
 import cloudinary from "../config/cloudinaryConfig.js";
-import https from "https";
-import http from "http";
 
 const router = express.Router();
 
@@ -21,13 +19,8 @@ const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =
       folder,
       public_id: filename.replace(/\.[^/.]+$/, ""), // strip ext
       resource_type,
-      type: "upload", // this makes it public
+      type: "upload",
     };
-
-    // Force proper extension for PDFs
-    if (resource_type === "raw" && mimetype === "application/pdf") {
-      options.format = "pdf";
-    }
 
     const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
       if (err) return reject(err);
@@ -35,14 +28,13 @@ const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =
     });
 
     const readable = new Readable();
-    readable._read = () => { };
+    readable._read = () => {};
     readable.push(buffer);
     readable.push(null);
     readable.pipe(stream);
   });
 
-
-/* ---------------- CREATE POST (multiple files) ---------------- */
+/* ---------------- CREATE POST (images only) ---------------- */
 router.post("/", upload.array("files", 10), async (req, res) => {
   try {
     const { userId, content, visibility } = req.body;
@@ -53,24 +45,23 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     let images = [];
-    let documents = [];
 
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
-        const resource_type = file.mimetype.startsWith("image/") ? "image" : "raw";
+        // ✅ Allow only image mimetypes
+        if (!file.mimetype.startsWith("image/")) {
+          return res.status(400).json({ message: "Only image uploads are allowed" });
+        }
+
         const url = await uploadToCloudinary(
           file.buffer,
           "posts",
           `${Date.now()}-${file.originalname}`,
-          resource_type,
+          "image",
           file.mimetype
         );
 
-        if (resource_type === "image") {
-          images.push({ url, downloadUrl: url });
-        } else {
-          documents.push({ url, downloadUrl: url });
-        }
+        images.push({ url, downloadUrl: url });
       }
     }
 
@@ -79,7 +70,6 @@ router.post("/", upload.array("files", 10), async (req, res) => {
       username: user.username,
       content,
       images,
-      documents,
     });
 
     await newPost.save();
@@ -87,42 +77,6 @@ router.post("/", upload.array("files", 10), async (req, res) => {
   } catch (error) {
     console.error("Create post error:", error);
     res.status(500).json({ message: "Error creating post", error: error.message });
-  }
-});
-
-router.get("/:postId/download/:docIndex", async (req, res) => {
-  try {
-    const { postId, docIndex } = req.params;
-    const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: "Post not found" });
-
-    const doc = post.documents[docIndex];
-    if (!doc) return res.status(404).json({ message: "Document not found" });
-
-    // Use Cloudinary API to generate signed URL for private PDFs
-    const publicId = doc.url.split("/").pop().split(".")[0]; // get publicId from URL
-    const signedUrl = cloudinary.url(publicId, {
-      resource_type: "raw",
-      sign_url: true,
-      type: "upload",
-      expires_at: Math.floor(Date.now() / 1000) + 300, // valid for 5 mins
-    });
-
-    // Force download
-    res.setHeader("Content-Disposition", `attachment; filename=document_${docIndex + 1}.pdf`);
-
-    const client = signedUrl.startsWith("https") ? https : http;
-    client.get(signedUrl, (cloudRes) => {
-      if (cloudRes.statusCode !== 200) {
-        return res.status(cloudRes.statusCode).send("Failed to fetch PDF");
-      }
-      cloudRes.pipe(res);
-    }).on("error", (err) => {
-      res.status(500).json({ message: "Error downloading file", error: err.message });
-    });
-
-  } catch (err) {
-    res.status(500).json({ message: "Error downloading file", error: err.message });
   }
 });
 
