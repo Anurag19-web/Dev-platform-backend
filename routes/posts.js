@@ -18,17 +18,17 @@ const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =
     const options = {
       folder,
       public_id: filename.replace(/\.[^/.]+$/, ""), // strip ext
-      resource_type,
+      resource_type: "auto",
       type: "upload",
     };
 
     const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
       if (err) return reject(err);
-      resolve(result.secure_url);
+      resolve(result);
     });
 
     const readable = new Readable();
-    readable._read = () => {};
+    readable._read = () => { };
     readable.push(buffer);
     readable.push(null);
     readable.pipe(stream);
@@ -53,7 +53,7 @@ router.post("/", upload.array("files", 10), async (req, res) => {
           return res.status(400).json({ message: "Only image uploads are allowed" });
         }
 
-        const url = await uploadToCloudinary(
+        const result = await uploadToCloudinary(
           file.buffer,
           "posts",
           `${Date.now()}-${file.originalname}`,
@@ -61,7 +61,11 @@ router.post("/", upload.array("files", 10), async (req, res) => {
           file.mimetype
         );
 
-        images.push({ url, downloadUrl: url });
+        images.push({
+          url: result.secure_url,
+          downloadUrl: result.secure_url,
+          public_id: result.public_id
+        });
       }
     }
 
@@ -148,10 +152,88 @@ router.delete("/:postId", async (req, res) => {
     // Only owner can delete
     if (post.userId !== userId) return res.status(403).json({ message: "Not authorized" });
 
+    // ✅ delete images from Cloudinary
+    for (const img of post.images) {
+      if (img.public_id) {
+        await cloudinary.uploader.destroy(img.public_id);
+      }
+    }
+
     await post.deleteOne();
     res.json({ message: "Post deleted successfully", postId });
   } catch (error) {
     res.status(500).json({ message: "Error deleting post", error: error.message });
+  }
+});
+
+// Update post (content + replace/delete images)
+router.put("/:postId", upload.array("files", 10), async (req, res) => {
+  const { postId } = req.params;
+  const { userId, content, removeImages } = req.body; // `removeImages` is optional flag
+
+  if (!userId) {
+    return res.status(400).json({ message: "userId is required" });
+  }
+
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    // Only owner can edit
+    if (post.userId !== userId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // ✅ Update text
+    if (content) {
+      post.content = content;
+    }
+
+    if (removeImages && Array.isArray(removeImages)) {
+      for (const identifier of removeImages) {
+        const img = post.images.find(
+          img => img._id.toString() === identifier || img.public_id === identifier
+        );
+
+        if (img && img.public_id) {
+          await cloudinary.uploader.destroy(img.public_id); // delete from Cloudinary
+        }
+      }
+      post.images = post.images.filter(
+        img => !removeImages.includes(img._id.toString()) && !removeImages.includes(img.public_id)
+      );
+    }
+
+    // ✅ Replace with new images if uploaded
+    if (req.files && req.files.length > 0) {
+      let newImages = [];
+      for (const file of req.files) {
+        if (!file.mimetype.startsWith("image/")) {
+          return res.status(400).json({ message: "Only image uploads are allowed" });
+        }
+
+        const result = await uploadToCloudinary(
+          file.buffer,
+          "posts",
+          `${Date.now()}-${file.originalname}`,
+          "image",
+          file.mimetype
+        );
+
+        newImages.push({
+          url: result.secure_url,
+          downloadUrl: result.secure_url,
+          public_id: result.public_id
+        });
+      }
+      post.images = [...post.images, ...newImages];
+    }
+
+    await post.save();
+    res.json({ message: "Post updated successfully", post });
+  } catch (error) {
+    console.error("Error updating post:", error);
+    res.status(500).json({ message: "Error updating post", error: error.message });
   }
 });
 

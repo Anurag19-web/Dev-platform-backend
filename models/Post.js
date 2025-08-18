@@ -7,7 +7,7 @@ const postSchema = new mongoose.Schema({
     required: true
   },
   username: {
-    type: String, // username of the post creator
+    type: String,
     required: true,
   },
   content: {
@@ -21,7 +21,7 @@ const postSchema = new mongoose.Schema({
     }
   ],
   likes: {
-    type: [String], // userIds of people who liked
+    type: [String],
     default: []
   },
   comments: [
@@ -33,7 +33,7 @@ const postSchema = new mongoose.Schema({
     }
   ],
   shares: {
-    type: [String], // userIds of people who shared
+    type: [String],
     default: []
   }
 }, { timestamps: true });
