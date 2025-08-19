@@ -1,16 +1,20 @@
 // routes/posts.js
 import express from "express";
 import multer from "multer";
+import crypto from "crypto";
 import { Post } from "../models/Post.js";
+import Image from "../models/Image.js";
 import User from "../models/User.js";
 import { Readable } from "stream";
 import cloudinary from "../config/cloudinaryConfig.js";
 
 const router = express.Router();
-
-// Multer memory storage
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+function getBufferHash(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
 
 // Helper to upload buffer to Cloudinary
 const uploadToCloudinary = (buffer, folder, filename, resource_type, mimetype) =>
@@ -53,19 +57,39 @@ router.post("/", upload.array("files", 10), async (req, res) => {
           return res.status(400).json({ message: "Only image uploads are allowed" });
         }
 
-        const result = await uploadToCloudinary(
-          file.buffer,
-          "posts",
-          `${Date.now()}-${file.originalname}`,
-          "image",
-          file.mimetype
-        );
+        const imageHash = getBufferHash(file.buffer);
 
-        images.push({
-          url: result.secure_url,
-          downloadUrl: result.secure_url,
-          public_id: result.public_id
-        });
+        // Check if image with this hash already uploaded
+        let existingImage = await Image.findOne({ hash: imageHash });
+
+        if (existingImage) {
+          // Reuse existing Cloudinary info
+          images.push({
+            url: existingImage.url,
+            downloadUrl: existingImage.url,
+            public_id: existingImage.public_id,
+            hash: imageHash
+          });
+        } else {
+          // Upload new image
+          const result = await uploadToCloudinary(
+            file.buffer,
+            "posts",
+            `${Date.now()}-${file.originalname}`
+          );
+          // Save in Image collection
+          await Image.create({
+            hash: imageHash,
+            url: result.secure_url,
+            public_id: result.public_id
+          });
+          images.push({
+            url: result.secure_url,
+            downloadUrl: result.secure_url,
+            public_id: result.public_id,
+            hash: imageHash
+          });
+        }
       }
     }
 
@@ -179,12 +203,10 @@ router.put("/:postId", upload.array("files", 10), async (req, res) => {
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Only owner can edit
     if (post.userId !== userId) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // ✅ Update text
     if (content) {
       post.content = content;
     }
@@ -194,9 +216,10 @@ router.put("/:postId", upload.array("files", 10), async (req, res) => {
         const img = post.images.find(
           img => img._id.toString() === identifier || img.public_id === identifier
         );
-
         if (img && img.public_id) {
-          await cloudinary.uploader.destroy(img.public_id); // delete from Cloudinary
+          await cloudinary.uploader.destroy(img.public_id);
+          // Optionally, remove from Image collection based on hash or public_id, if you want to clean up
+          await Image.deleteOne({ public_id: img.public_id });
         }
       }
       post.images = post.images.filter(
@@ -204,28 +227,57 @@ router.put("/:postId", upload.array("files", 10), async (req, res) => {
       );
     }
 
-    // ✅ Replace with new images if uploaded
     if (req.files && req.files.length > 0) {
       let newImages = [];
+
+      // Get existing hashes
+      const existingImageHashes = post.images.map(img => img.hash);
+
       for (const file of req.files) {
         if (!file.mimetype.startsWith("image/")) {
           return res.status(400).json({ message: "Only image uploads are allowed" });
         }
 
-        const result = await uploadToCloudinary(
-          file.buffer,
-          "posts",
-          `${Date.now()}-${file.originalname}`,
-          "image",
-          file.mimetype
-        );
+        const imageHash = getBufferHash(file.buffer);
 
-        newImages.push({
-          url: result.secure_url,
-          downloadUrl: result.secure_url,
-          public_id: result.public_id
-        });
+        if (existingImageHashes.includes(imageHash)) {
+          // Already in post images, skip upload & avoid duplicate in post array
+          continue;
+        }
+
+        let existingImage = await Image.findOne({ hash: imageHash });
+
+        if (existingImage) {
+          // Reuse existing Cloudinary info
+          newImages.push({
+            url: existingImage.url,
+            downloadUrl: existingImage.url,
+            public_id: existingImage.public_id,
+            hash: imageHash
+          });
+        } else {
+          // Upload new image
+          const result = await uploadToCloudinary(
+            file.buffer,
+            "posts",
+            `${Date.now()}-${file.originalname}`
+          );
+
+          await Image.create({
+            hash: imageHash,
+            url: result.secure_url,
+            public_id: result.public_id
+          });
+
+          newImages.push({
+            url: result.secure_url,
+            downloadUrl: result.secure_url,
+            public_id: result.public_id,
+            hash: imageHash
+          });
+        }
       }
+
       post.images = [...post.images, ...newImages];
     }
 
