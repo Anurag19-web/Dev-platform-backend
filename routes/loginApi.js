@@ -32,4 +32,23 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// ================= Update Password =================
+router.put("/update-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    // hash new password before saving
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await User.findOneAndUpdate(
+      { email },
+      { password: hashedPassword }
+    );
+
+    res.json({ success: true, message: "Password updated successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;
