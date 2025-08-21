@@ -143,36 +143,38 @@ router.get("/feed/:userId", async (req, res) => {
 
     // logged-in user
     const loggedInUser = await User.findOne({ userId });
-    if (!loggedInUser) return res.status(404).json({ message: "User not found" });
+    if (!loggedInUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    // Collect all users that logged-in user follows + himself
-    const followingIds = loggedInUser.following; // already array of userIds
-    const allowedUserIds = [loggedInUser.userId, ...followingIds];
+    // fetch all posts
+    const posts = await Post.find().sort({ createdAt: -1 });
 
-    // get all users that match
-    const users = await User.find({ userId: { $in: allowedUserIds } });
+    // fetch all authors at once
+    const authorIds = [...new Set(posts.map(p => p.userId))]; // unique userIds
+    const authors = await User.find({ userId: { $in: authorIds } });
 
-    // filter users by privacy
-    const visibleUsers = users.filter((u) => {
-      if (!u.isPrivate) return true; // public → always visible
-      if (u.userId === loggedInUser.userId) return true; // self → visible
-      return u.followers.includes(loggedInUser.userId); // private → only if follower
+    // create map for quick lookup
+    const authorMap = {};
+    authors.forEach(a => {
+      authorMap[a.userId] = a;
     });
 
-    // collect visible userIds
-    const visibleUserIds = visibleUsers.map((u) => u.userId);
+    // filter posts based on privacy
+    const visiblePosts = posts.filter(p => {
+      const author = authorMap[p.userId];
+      if (!author) return false;
 
-    // fetch posts of only visible users
-    const posts = await Post.find({ userId: { $in: visibleUserIds } })
-      .sort({ createdAt: -1 });
+      if (!author.isPrivate) return true; // public → always visible
+      return author.followers.includes(loggedInUser.userId); // private → only if follower
+    });
 
-    res.json(posts);
+    res.json(visiblePosts);
   } catch (err) {
     console.error("Feed Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
