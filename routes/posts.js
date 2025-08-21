@@ -141,8 +141,8 @@ router.get("/feed/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // Get the logged-in user's following list
-    const user = await User.findById(userId);
+    // Find user by customId
+    const user = await User.findOne({ userId }); 
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const followingIds = user.following || [];
