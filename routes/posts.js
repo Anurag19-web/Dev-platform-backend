@@ -136,6 +136,43 @@ router.post("/user/:id", async (req, res) => {
   }
 });
 
+// Feed route
+router.get("/feed/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // logged-in user
+    const loggedInUser = await User.findOne({ userId });
+    if (!loggedInUser) return res.status(404).json({ message: "User not found" });
+
+    // Collect all users that logged-in user follows + himself
+    const followingIds = loggedInUser.following; // already array of userIds
+    const allowedUserIds = [loggedInUser.userId, ...followingIds];
+
+    // get all users that match
+    const users = await User.find({ userId: { $in: allowedUserIds } });
+
+    // filter users by privacy
+    const visibleUsers = users.filter((u) => {
+      if (!u.isPrivate) return true; // public → always visible
+      if (u.userId === loggedInUser.userId) return true; // self → visible
+      return u.followers.includes(loggedInUser.userId); // private → only if follower
+    });
+
+    // collect visible userIds
+    const visibleUserIds = visibleUsers.map((u) => u.userId);
+
+    // fetch posts of only visible users
+    const posts = await Post.find({ userId: { $in: visibleUserIds } })
+      .sort({ createdAt: -1 });
+
+    res.json(posts);
+  } catch (err) {
+    console.error("Feed Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {

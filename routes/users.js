@@ -84,6 +84,31 @@ router.patch("/users/:id/profile-picture", upload.single("profilePicture"), asyn
   }
 });
 
+// New route to get visible users
+router.get("/visible-users/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // logged-in user
+    const loggedInUser = await User.findOne({ userId });
+    if (!loggedInUser) return res.status(404).json({ message: "User not found" });
+
+    // get all users
+    const allUsers = await User.find();
+
+    // filter based on privacy rules
+    const visibleUsers = allUsers.filter((u) => {
+      if (u.userId === loggedInUser.userId) return false; // skip self
+      if (!u.isPrivate) return true; // public → always visible
+      return u.followers.includes(loggedInUser.userId); // private → only if follower
+    });
+
+    res.json(visibleUsers);
+  } catch (err) {
+    console.error("Visible Users Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // ✅ FOLLOW a user
 router.patch("/users/:id/follow", async (req, res) => {
