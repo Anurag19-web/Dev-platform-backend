@@ -1,27 +1,35 @@
 import express from "express";
 import multer from "multer";
-import path from "path";
 import User from "../models/User.js";
+import { Readable } from "stream";
+import cloudinary from "../config/cloudinaryConfig.js";
 
 const router = express.Router();
-
-// Multer storage config
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+const uploadToCloudinary = (buffer, folder, filename) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, public_id: filename.replace(/\.[^/.]+$/, ""), resource_type: "auto" },
+      (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      }
+    );
+
+    const readable = new Readable();
+    readable._read = () => {};
+    readable.push(buffer);
+    readable.push(null);
+    readable.pipe(stream);
+  });
 
 // ✅ GET user profile (fetch privacy setting)
 router.get("/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("username email isPrivate");
     if (!user) return res.status(404).json({ message: "User not found" });
-
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch user" });
@@ -72,15 +80,18 @@ router.patch("/users/:id", async (req, res) => {
   }
 });
 
-
 // ✅ Upload profile picture
 router.patch("/users/:id/profile-picture", upload.single("profilePicture"), async (req, res) => {
   try {
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : "";
+    if (!req.file) return res.status(400).json({ message: "No image provided" });
 
+    // Upload to Cloudinary
+    const result = await uploadToCloudinary(req.file.buffer, "profile_pictures", `${Date.now()}-${req.file.originalname}`);
+
+    // Update user
     const updatedUser = await User.findOneAndUpdate(
       { userId: req.params.id },
-      { profilePicture: imagePath },
+      { profilePicture: result.secure_url },
       { new: true }
     );
 
@@ -88,7 +99,8 @@ router.patch("/users/:id/profile-picture", upload.single("profilePicture"), asyn
 
     res.status(200).json({ message: "Profile picture updated", user: updatedUser });
   } catch (err) {
-    res.status(500).json({ message: "Image upload failed", error: err.message });
+    console.error("Profile picture upload failed:", err);
+    res.status(500).json({ message: "Upload failed", error: err.message });
   }
 });
 
@@ -96,19 +108,13 @@ router.patch("/users/:id/profile-picture", upload.single("profilePicture"), asyn
 router.get("/visible-users/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-
-    // logged-in user
     const loggedInUser = await User.findOne({ userId });
     if (!loggedInUser) return res.status(404).json({ message: "User not found" });
 
-    // get all users
-    const allUsers = await User.find();
-
-    // filter based on privacy rules
     const visibleUsers = await User.find({
       $or: [
         { isPrivate: false },
-        { isPrivate: true, followers: loggedInUser.userId }
+        { isPrivate: true, followers: { $in: [loggedInUser.userId] } }
       ],
       userId: { $ne: loggedInUser.userId }
     });
@@ -166,7 +172,6 @@ router.patch("/users/:id/follow", async (req, res) => {
     res.status(500).json({ message: "Follow failed", error: err.message });
   }
 });
-
 
 // ✅ UNFOLLOW a user
 router.patch("/users/:id/unfollow", async (req, res) => {
