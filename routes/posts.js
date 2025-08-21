@@ -140,38 +140,21 @@ router.post("/user/:id", async (req, res) => {
 router.get("/feed/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    // Get the logged-in user's following list
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // logged-in user
-    const loggedInUser = await User.findOne({ userId });
-    if (!loggedInUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const followingIds = user.following || [];
 
-    // fetch all posts
-    const posts = await Post.find().sort({ createdAt: -1 });
+    // Fetch posts from followed users + own posts
+    const posts = await Post.find({
+      userId: { $in: [...followingIds, userId] }
+    }).sort({ createdAt: -1 }); // latest first
 
-    // fetch all authors at once
-    const authorIds = [...new Set(posts.map(p => p.userId))]; // unique userIds
-    const authors = await User.find({ userId: { $in: authorIds } });
-
-    // create map for quick lookup
-    const authorMap = {};
-    authors.forEach(a => {
-      authorMap[a.userId] = a;
-    });
-
-    // filter posts based on privacy
-    const visiblePosts = posts.filter(p => {
-      const author = authorMap[p.userId];
-      if (!author) return false;
-
-      if (!author.isPrivate) return true; // public → always visible
-      return author.followers.includes(loggedInUser.userId); // private → only if follower
-    });
-
-    res.json(visiblePosts);
+    res.json({ posts });
   } catch (err) {
-    console.error("Feed Error:", err);
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
