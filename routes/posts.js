@@ -108,6 +108,35 @@ router.post("/", upload.array("files", 10), async (req, res) => {
   }
 });
 
+// get posts of a user (respect privacy & follow)
+router.post("/user/:id", async (req, res) => {
+  try {
+    const { id } = req.params;     // profile owner
+    const { userId } = req.body;   // logged-in user
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // check privacy
+    if (
+      user.isPrivate &&
+      user._id.toString() !== userId && // not the owner
+      !user.followers.includes(userId) // not a follower
+    ) {
+      return res
+        .status(403)
+        .json({ message: "This account is private. Follow to see posts." });
+    }
+
+    const posts = await Post.find({ user: id }).sort({ createdAt: -1 });
+    res.json(posts);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
   try {

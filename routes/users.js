@@ -16,6 +16,36 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ✅ GET user profile (fetch privacy setting)
+router.get("/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("username email isPrivate");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+// ✅ PATCH privacy toggle
+router.patch("/:id/privacy", async (req, res) => {
+  try {
+    const { isPrivate } = req.body;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { isPrivate },
+      { new: true }
+    ).select("username email isPrivate");
+
+    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+
+    res.json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update privacy setting" });
+  }
+});
 
 // ✅ Update profile data
 router.patch("/users/:id", async (req, res) => {
