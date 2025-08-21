@@ -28,22 +28,26 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ✅ PATCH privacy toggle
-router.patch("/:id/privacy", async (req, res) => {
+// ✅ Toggle privacy
+router.patch("/users/:id/privacy", async (req, res) => {
   try {
+    const { id } = req.params;
     const { isPrivate } = req.body;
 
     const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
+      id,
       { isPrivate },
       { new: true }
-    ).select("username email isPrivate");
+    );
 
-    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    res.json(updatedUser);
+    res.json({ isPrivate: updatedUser.isPrivate });
   } catch (err) {
-    res.status(500).json({ error: "Failed to update privacy setting" });
+    console.error("Privacy update error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -97,10 +101,12 @@ router.get("/visible-users/:userId", async (req, res) => {
     const allUsers = await User.find();
 
     // filter based on privacy rules
-    const visibleUsers = allUsers.filter((u) => {
-      if (u.userId === loggedInUser.userId) return false; // skip self
-      if (!u.isPrivate) return true; // public → always visible
-      return u.followers.includes(loggedInUser.userId); // private → only if follower
+    const visibleUsers = await User.find({
+      $or: [
+        { isPrivate: false },
+        { isPrivate: true, followers: loggedInUser.userId }
+      ],
+      userId: { $ne: loggedInUser.userId }
     });
 
     res.json(visibleUsers);
