@@ -29,13 +29,17 @@ router.get("/:id", async (req, res) => {
 });
 
 // ✅ Toggle privacy
-router.patch("/users/:id/privacy", async (req, res) => {
+router.patch("/users/:userId/privacy", async (req, res) => {
   try {
-    const { id } = req.params;
+    const { userId } = req.params;
     const { isPrivate } = req.body;
 
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
+    if (typeof isPrivate !== "boolean") {
+      return res.status(400).json({ message: "Invalid privacy value" });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { userId },
       { isPrivate },
       { new: true }
     );
