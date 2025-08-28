@@ -136,25 +136,32 @@ router.post("/user/:id", async (req, res) => {
   }
 });
 
-// Feed route
+// Feed route: followed first, then others
 router.get("/feed/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    
-    // Find user by customId
-    const user = await User.findOne({ userId }); 
+
+    const user = await User.findOne({ userId });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const followingIds = user.following || [];
 
-    // Fetch posts from followed users + own posts
-    const posts = await Post.find({
+    // 1. Posts from followed users + self
+    const followedPosts = await Post.find({
       userId: { $in: [...followingIds, userId] }
-    }).sort({ createdAt: -1 }); // latest first
+    }).sort({ createdAt: -1 }).lean();
+
+    // 2. Posts from everyone else
+    const otherPosts = await Post.find({
+      userId: { $nin: [...followingIds, userId] }
+    }).sort({ createdAt: -1 }).lean();
+
+    // 3. Merge: followed first, then others
+    const posts = [...followedPosts, ...otherPosts];
 
     res.json({ posts });
   } catch (err) {
-    console.error(err);
+    console.error("Feed error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
