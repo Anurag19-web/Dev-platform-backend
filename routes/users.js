@@ -3,6 +3,7 @@ import multer from "multer";
 import User from "../models/User.js";
 import { Readable } from "stream";
 import cloudinary from "../config/cloudinaryConfig.js";
+import bcrypt from "bcryptjs";
 
 const router = express.Router();
 const storage = multer.memoryStorage();
@@ -63,16 +64,27 @@ router.patch("/users/:userId/privacy", async (req, res) => {
   }
 });
 
-// ✅ Update profile data
+// ✅ Update profile data (with password hashing)
 router.patch("/users/:id", async (req, res) => {
   try {
+    const { password, ...otherFields } = req.body;
+
+    const updateData = { ...otherFields };
+
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+
     const updatedUser = await User.findOneAndUpdate(
       { userId: req.params.id },
-      { $set: req.body },
+      { $set: updateData },
       { new: true }
     );
 
-    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     res.status(200).json({ message: "Profile updated", user: updatedUser });
   } catch (error) {
