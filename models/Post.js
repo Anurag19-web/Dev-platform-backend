@@ -10,6 +10,10 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  profilePicture: {
+    type: String,
+    default: ""
+  },
   content: {
     type: String,
     required: true
