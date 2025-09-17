@@ -32,6 +32,7 @@ const postSchema = new mongoose.Schema({
     {
       userId: { type: String, ref: "User", required: true },
       username: { type: String, required: true },
+      profilePicture: { type: String, required: true },
       text: { type: String, required: true },
       createdAt: { type: Date, default: Date.now }
     }

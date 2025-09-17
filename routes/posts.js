@@ -429,21 +429,19 @@ router.post("/:postId/comment", async (req, res) => {
     post.comments.push({
       userId,
       username: user.username,
+      profilePicture: user.profilePicture,
       text
     });
 
     await post.save();
 
-    const commentUserIds = [...new Set(post.comments.map(c => c.userId))];
-    const commentUsers = await User.find({ userId: { $in: commentUserIds } })
-      .select("userId username profilePicture")
-      .lean();
-    const commentUserMap = Object.fromEntries(commentUsers.map(u => [u.userId, u]));
-
-    // Return comments with user info
     const commentsWithUsers = post.comments.map(c => ({
-      ...c.toObject(),
-      user: commentUserMap[c.userId] || { userId: c.userId, username: c.username, profilePicture: null }
+      _id: c._id,
+      userId: c.userId,
+      username: c.username,
+      profilePicture: c.profilePicture,
+      text: c.text,
+      createdAt: c.createdAt
     }));
 
     res.json({ message: "Comment added", comments: commentsWithUsers });
