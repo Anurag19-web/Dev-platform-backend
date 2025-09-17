@@ -45,7 +45,7 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     if (!content) return res.status(400).json({ message: "Content is required" });
     if (!userId) return res.status(400).json({ message: "userId is required" });
 
-    const user = await User.findOne({ userId }).select("username");
+    const user = await User.findOne({ userId }).select("username profilePicture");
     if (!user) return res.status(404).json({ message: "User not found" });
 
     let images = [];
@@ -96,6 +96,7 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     const newPost = new Post({
       userId,
       username: user.username,
+      profilePicture: user.profilePicture,
       content,
       images,
     });
@@ -433,14 +434,16 @@ router.post("/:postId/comment", async (req, res) => {
 
     await post.save();
 
+    const commentUserIds = [...new Set(post.comments.map(c => c.userId))];
+    const commentUsers = await User.find({ userId: { $in: commentUserIds } })
+      .select("userId username profilePicture")
+      .lean();
+    const commentUserMap = Object.fromEntries(commentUsers.map(u => [u.userId, u]));
+
     // Return comments with user info
     const commentsWithUsers = post.comments.map(c => ({
       ...c.toObject(),
-      user: {
-        userId: c.userId,
-        username: c.username, // Already stored
-        profilePicture: userId === c.userId ? user.profilePicture : null
-      }
+      user: commentUserMap[c.userId] || { userId: c.userId, username: c.username, profilePicture: null }
     }));
 
     res.json({ message: "Comment added", comments: commentsWithUsers });
