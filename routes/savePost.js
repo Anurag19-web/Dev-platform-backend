@@ -60,7 +60,7 @@ router.get("/:userId/saved", async (req, res) => {
     const Post = await import("../models/Post.js").then(m => m.default);
 
     // Fetch posts using saved post IDs
-    const posts = await Post.find({ _id: { $in: user.savedPosts } });
+    const posts = await Post.find({ postId: { $in: user.savedPosts } });
 
     if (!posts.length) return res.json([]);
 
