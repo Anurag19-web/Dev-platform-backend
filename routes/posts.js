@@ -128,7 +128,33 @@ router.post("/user/:id", async (req, res) => {
         .json({ message: "This account is private. Follow to see posts." });
     }
 
-    const posts = await Post.find({ user: id }).sort({ createdAt: -1 });
+    const posts = await Post.aggregate([
+      { $match: { userId: id } },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "userId",
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          content: 1,
+          images: 1,
+          likes: 1,
+          comments: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userId: 1,
+          username: "$userInfo.username",
+          profilePicture: "$userInfo.profilePicture"
+        }
+      }
+    ]);
+
     res.json(posts);
   } catch (err) {
     console.error(err);
@@ -147,14 +173,60 @@ router.get("/feed/:userId", async (req, res) => {
     const followingIds = user.following || [];
 
     // 1. Posts from followed users + self
-    const followedPosts = await Post.find({
-      userId: { $in: [...followingIds, userId] }
-    }).sort({ createdAt: -1 }).lean();
+    const followedPosts = await Post.aggregate([
+      { $match: { userId: { $in: [...followingIds, userId] } } },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "userId",
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          content: 1,
+          images: 1,
+          likes: 1,
+          comments: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userId: 1,
+          username: "$userInfo.username",
+          profilePicture: "$userInfo.profilePicture"
+        }
+      }
+    ]);
 
     // 2. Posts from everyone else
-    const otherPosts = await Post.find({
-      userId: { $nin: [...followingIds, userId] }
-    }).sort({ createdAt: -1 }).lean();
+    const otherPosts = await Post.aggregate([
+      { $match: { userId: { $nin: [...followingIds, userId] } } },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "userId",
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          content: 1,
+          images: 1,
+          likes: 1,
+          comments: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userId: 1,
+          username: "$userInfo.username",
+          profilePicture: "$userInfo.profilePicture"
+        }
+      }
+    ]);
 
     // 3. Merge: followed first, then others
     const posts = [...followedPosts, ...otherPosts];
