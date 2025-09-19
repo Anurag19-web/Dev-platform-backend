@@ -1,4 +1,3 @@
-// routes/posts.js
 import express from "express";
 import multer from "multer";
 import crypto from "crypto";
@@ -94,7 +93,7 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     }
 
     const newPost = new Post({
-      userId, // just keep reference
+      userId,
       username: user.username,
       profilePicture: user.profilePicture,
       content,
@@ -407,11 +406,11 @@ router.get("/:postId/likes", async (req, res) => {
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
-    const { userId, text } = req.body;
+    const { userId, text, username } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text) {
-      return res.status(400).json({ message: "userId and text are required" });
+    if (!userId || !text || !username) {
+      return res.status(400).json({ message: "userId and text and username are required" });
     }
 
     // Find user to get username
@@ -438,6 +437,8 @@ router.post("/:postId/comment", async (req, res) => {
     const commentsWithUsers = post.comments.map(c => ({
       _id: c._id,
       userId: c.userId,
+      username: c.username,
+      profilePicture: c.profilePicture,
       text: c.text,
       createdAt: c.createdAt
     }));
