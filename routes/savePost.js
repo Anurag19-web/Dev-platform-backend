@@ -53,18 +53,22 @@ router.delete("/:userId/:postId", async (req, res) => {
 
 // Get all saved posts with dynamic username & profilePicture
 router.get("/:userId/saved", async (req, res) => {
+  const { userId } = req.params;
+
   try {
-    const { userId } = req.params;
     const user = await User.findOne({ userId });
     if (!user) return res.status(404).json({ error: "User not found" });
 
     if (!user.savedPosts || user.savedPosts.length === 0) return res.json([]);
 
-    // Convert savedPosts to ObjectId
-    const postObjectIds = user.savedPosts.map(id => mongoose.Types.ObjectId(id));
+    // Convert savedPosts to ObjectId safely
+    const postObjectIds = user.savedPosts
+      .filter(id => mongoose.Types.ObjectId.isValid(id)) // <-- only keep valid IDs
+      .map(id => mongoose.Types.ObjectId(id));
+
+    if (!postObjectIds.length) return res.json([]);
 
     const posts = await Post.find({ _id: { $in: postObjectIds } });
-
     if (!posts.length) return res.json([]);
 
     const uniqueUserIds = [...new Set(posts.map(p => p.userId))];
