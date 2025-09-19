@@ -52,11 +52,27 @@ router.delete("/:userId/:postId", async (req, res) => {
 // Get all saved posts
 router.get("/:userId/saved", async (req, res) => {
   try {
-    const user = await User.findOne({ userId: req.params.userId })
-      .populate("savedPosts");
+    const user = await User.findOne({ userId: req.params.userId });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json(user.savedPosts);
+    // Fetch all saved posts
+    const Post = await import("../models/Post.js").then(m => m.default);
+
+    const posts = await Post.find({ _id: { $in: user.savedPosts } });
+
+    // Fetch all unique users for these posts
+    const uniqueUserIds = [...new Set(posts.map(p => p.userId))];
+    const users = await User.find({ userId: { $in: uniqueUserIds } });
+    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
+
+    // Attach username and profilePicture
+    const savedPosts = posts.map(post => ({
+      ...post._doc,
+      username: userMap[post.userId]?.username || "Unknown",
+      profilePicture: userMap[post.userId]?.profilePicture || "default.png",
+    }));
+
+    res.json(savedPosts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
