@@ -527,11 +527,11 @@ router.get("/:postId/likes", async (req, res) => {
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
-    const { userId, text } = req.body;
+    const { userId, text, username } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text) {
-      return res.status(400).json({ message: "userId and text are required" });
+    if (!userId || !text || !username) {
+      return res.status(400).json({ message: "userId and text and username are required" });
     }
 
     // Find user to get username
@@ -548,13 +548,23 @@ router.post("/:postId/comment", async (req, res) => {
     // Store username inside the comment
     post.comments.push({
       userId,
-      text,
-      createdAt: new Date()
+      // username: user.username,
+      // profilePicture: user.profilePicture,
+      text
     });
 
     await post.save();
 
-    res.json({ message: "Comment added" });
+    const commentsWithUsers = post.comments.map(c => ({
+      _id: c._id,
+      userId: c.userId,
+      username: c.username,
+      profilePicture: c.profilePicture,
+      text: c.text,
+      createdAt: c.createdAt
+    }));
+
+    res.json({ message: "Comment added", comments: commentsWithUsers });
   } catch (error) {
     res.status(500).json({ message: "Error adding comment", error: error.message });
   }
@@ -604,99 +614,6 @@ router.delete("/:postId/comment/:commentId", async (req, res) => {
   } catch (error) {
     console.error("Delete comment error:", error.stack);
     res.status(500).json({ error: "Server error" });
-  }
-});
-
-// GET /api/posts/user/:userId
-router.get("/user/:userId", async (req, res) => {
-  const { userId } = req.params;
-
-  try {
-    const posts = await Post.aggregate([
-      { $match: { userId } },
-      { $sort: { createdAt: -1 } },
-
-      // Lookup post owner
-      {
-        $lookup: {
-          from: "users",
-          localField: "userId",
-          foreignField: "userId",
-          as: "userInfo"
-        }
-      },
-      { $unwind: "$userInfo" },
-
-      // Lookup commenters
-      {
-        $lookup: {
-          from: "users",
-          localField: "comments.userId",
-          foreignField: "userId",
-          as: "commentUsers"
-        }
-      },
-
-      // Rebuild comments with user info
-      {
-        $addFields: {
-          comments: {
-            $map: {
-              input: "$comments",
-              as: "c",
-              in: {
-                _id: "$$c._id",
-                text: "$$c.text",
-                createdAt: "$$c.createdAt",
-                userId: "$$c.userId",
-                user: {
-                  $let: {
-                    vars: {
-                      u: {
-                        $arrayElemAt: [
-                          {
-                            $filter: {
-                              input: "$commentUsers",
-                              as: "u",
-                              cond: { $eq: ["$$u.userId", "$$c.userId"] }
-                            }
-                          },
-                          0
-                        ]
-                      }
-                    },
-                    in: {
-                      userId: "$$u.userId",
-                      username: "$$u.username",
-                      profilePicture: "$$u.profilePicture"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-
-      {
-        $project: {
-          _id: 1,
-          content: 1,
-          images: 1,
-          likes: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          comments: 1,
-          userId: 1,
-          username: "$userInfo.username",
-          profilePicture: "$userInfo.profilePicture"
-        }
-      }
-    ]);
-
-    res.json({ posts });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching user posts", error: error.message });
   }
 });
 
