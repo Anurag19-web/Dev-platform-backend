@@ -530,8 +530,8 @@ router.post("/:postId/comment", async (req, res) => {
     const { userId, text, username } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text || !username) {
-      return res.status(400).json({ message: "userId and text and username are required" });
+    if (!userId || !text) {
+      return res.status(400).json({ message: "userId and text are required" });
     }
 
     // Find user to get username
@@ -548,23 +548,13 @@ router.post("/:postId/comment", async (req, res) => {
     // Store username inside the comment
     post.comments.push({
       userId,
-      // username: user.username,
-      // profilePicture: user.profilePicture,
-      text
+      text,
+      createdAt: new Date()
     });
 
     await post.save();
 
-    const commentsWithUsers = post.comments.map(c => ({
-      _id: c._id,
-      userId: c.userId,
-      username: c.username,
-      profilePicture: c.profilePicture,
-      text: c.text,
-      createdAt: c.createdAt
-    }));
-
-    res.json({ message: "Comment added", comments: commentsWithUsers });
+    res.json({ message: "Comment added" });
   } catch (error) {
     res.status(500).json({ message: "Error adding comment", error: error.message });
   }
@@ -616,6 +606,113 @@ router.delete("/:postId/comment/:commentId", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// GET /api/posts/user/:userId
+router.get("/user/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const posts = await Post.aggregate([
+      { $match: { userId } },   // filter by the profile owner
+      { $sort: { createdAt: -1 } },
+
+      // Join post owner
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "userId",  // or "_id" if you use ObjectId
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" },
+
+      // Join comment authors
+      {
+        $lookup: {
+          from: "users",
+          localField: "comments.userId",  // array of comment.userId
+          foreignField: "userId",
+          as: "commentUsers"
+        }
+      },
+
+      // Merge commentUsers into each comment
+      {
+        $addFields: {
+          comments: {
+            $map: {
+              input: "$comments",
+              as: "c",
+              in: {
+                _id: "$$c._id",
+                text: "$$c.text",
+                createdAt: "$$c.createdAt",
+                userId: "$$c.userId",
+                username: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$commentUsers",
+                            as: "cu",
+                            cond: { $eq: ["$$cu.userId", "$$c.userId"] }
+                          }
+                        },
+                        as: "cu",
+                        in: "$$cu.username"
+                      }
+                    },
+                    0
+                  ]
+                },
+                profilePicture: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $filter: {
+                            input: "$commentUsers",
+                            as: "cu",
+                            cond: { $eq: ["$$cu.userId", "$$c.userId"] }
+                          }
+                        },
+                        as: "cu",
+                        in: "$$cu.profilePicture"
+                      }
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+
+      // Final fields
+      {
+        $project: {
+          content: 1,
+          images: 1,
+          likes: 1,
+          comments: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userId: 1,
+          username: "$userInfo.username",
+          profilePicture: "$userInfo.profilePicture"
+        }
+      }
+    ]);
+
+    res.json({ posts });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user posts", error: error.message });
+  }
+});
+
 
 /* ---------------- GET SINGLE POST ---------------- */
 router.get("/:postId", async (req, res) => {
