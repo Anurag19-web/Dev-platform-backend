@@ -1,6 +1,5 @@
 // models/User.js
 import mongoose from "mongoose";
-import { Post } from "./Post";
 
 const userSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true },
@@ -11,12 +10,12 @@ const userSchema = new mongoose.Schema({
   bio:            { type: String, default: "" },
   skills:         { type: [String], default: [] },
   experience: [
-  {
-    company: { type: String },
-    role: { type: String },
-    duration: { type: String },
-  }
-],
+    {
+      company: { type: String },
+      role: { type: String },
+      duration: { type: String },
+    }
+  ],
   github:         { type: String, default: "" },
   linkedin:       { type: String, default: "" },
   profilePicture: { type: String, default: "" },
@@ -30,11 +29,14 @@ const userSchema = new mongoose.Schema({
   ]
 }, { timestamps: true });
 
-/* ------------------ Middleware to update comments on username/profilePicture change ------------------ */
+// Pre-save hook to update all comments when username or profilePicture changes
 userSchema.pre('save', async function(next) {
-  try {
-    // Check if username or profilePicture is modified
-    if (this.isModified('username') || this.isModified('profilePicture')) {
+  if (this.isModified('username') || this.isModified('profilePicture')) {
+    try {
+      // Dynamic import to avoid circular dependency
+      const PostModule = await import('./Post.js');
+      const Post = PostModule.default;
+
       await Post.updateMany(
         { "comments.userId": this.userId },
         { 
@@ -45,12 +47,11 @@ userSchema.pre('save', async function(next) {
         },
         { arrayFilters: [{ "elem.userId": this.userId }] }
       );
+    } catch (err) {
+      console.error("Error updating comments in posts:", err);
     }
-    next();
-  } catch (err) {
-    console.error("Error updating comments on user update:", err);
-    next(err);
   }
+  next();
 });
 
 const User = mongoose.model("User", userSchema);
