@@ -49,23 +49,29 @@ router.delete("/:userId/:postId", async (req, res) => {
 });
 
 
-// Get all saved posts
+// Get all saved posts with dynamic username & profilePicture
 router.get("/:userId/saved", async (req, res) => {
   try {
-    const user = await User.findOne({ userId: req.params.userId });
+    const { userId } = req.params;
+    const user = await User.findOne({ userId });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Fetch all saved posts
+    // Import Post model dynamically
     const Post = await import("../models/Post.js").then(m => m.default);
 
+    // Fetch posts using saved post IDs
     const posts = await Post.find({ _id: { $in: user.savedPosts } });
 
-    // Fetch all unique users for these posts
+    if (!posts.length) return res.json([]);
+
+    // Get all unique userIds from posts
     const uniqueUserIds = [...new Set(posts.map(p => p.userId))];
+
+    // Fetch user details for these posts
     const users = await User.find({ userId: { $in: uniqueUserIds } });
     const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
 
-    // Attach username and profilePicture
+    // Map posts with username & profilePicture dynamically
     const savedPosts = posts.map(post => ({
       ...post._doc,
       username: userMap[post.userId]?.username || "Unknown",
@@ -74,8 +80,10 @@ router.get("/:userId/saved", async (req, res) => {
 
     res.json(savedPosts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Error fetching saved posts:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
+
 
 export default router;
