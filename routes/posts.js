@@ -527,7 +527,7 @@ router.get("/:postId/likes", async (req, res) => {
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
-    const { userId, text, username } = req.body;
+    const { userId, text } = req.body;
     const { postId } = req.params;
 
     if (!userId || !text) {
@@ -613,93 +613,28 @@ router.get("/user/:userId", async (req, res) => {
 
   try {
     const posts = await Post.aggregate([
-      { $match: { userId } },   // filter by the profile owner
+      { $match: { userId } },
       { $sort: { createdAt: -1 } },
 
-      // Join post owner
       {
         $lookup: {
           from: "users",
           localField: "userId",
-          foreignField: "userId",  // or "_id" if you use ObjectId
+          foreignField: "userId",
           as: "userInfo"
         }
       },
       { $unwind: "$userInfo" },
 
-      // Join comment authors
-      {
-        $lookup: {
-          from: "users",
-          localField: "comments.userId",  // array of comment.userId
-          foreignField: "userId",
-          as: "commentUsers"
-        }
-      },
-
-      // Merge commentUsers into each comment
-      {
-        $addFields: {
-          comments: {
-            $map: {
-              input: "$comments",
-              as: "c",
-              in: {
-                _id: "$$c._id",
-                text: "$$c.text",
-                createdAt: "$$c.createdAt",
-                userId: "$$c.userId",
-                username: {
-                  $arrayElemAt: [
-                    {
-                      $map: {
-                        input: {
-                          $filter: {
-                            input: "$commentUsers",
-                            as: "cu",
-                            cond: { $eq: ["$$cu.userId", "$$c.userId"] }
-                          }
-                        },
-                        as: "cu",
-                        in: "$$cu.username"
-                      }
-                    },
-                    0
-                  ]
-                },
-                profilePicture: {
-                  $arrayElemAt: [
-                    {
-                      $map: {
-                        input: {
-                          $filter: {
-                            input: "$commentUsers",
-                            as: "cu",
-                            cond: { $eq: ["$$cu.userId", "$$c.userId"] }
-                          }
-                        },
-                        as: "cu",
-                        in: "$$cu.profilePicture"
-                      }
-                    },
-                    0
-                  ]
-                }
-              }
-            }
-          }
-        }
-      },
-
-      // Final fields
       {
         $project: {
+          _id: 1,
           content: 1,
           images: 1,
           likes: 1,
-          comments: 1,
           createdAt: 1,
           updatedAt: 1,
+          comments: 1,
           userId: 1,
           username: "$userInfo.username",
           profilePicture: "$userInfo.profilePicture"
@@ -712,7 +647,6 @@ router.get("/user/:userId", async (req, res) => {
     res.status(500).json({ message: "Error fetching user posts", error: error.message });
   }
 });
-
 
 /* ---------------- GET SINGLE POST ---------------- */
 router.get("/:postId", async (req, res) => {
