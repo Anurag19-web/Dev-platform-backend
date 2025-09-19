@@ -95,6 +95,8 @@ router.post("/", upload.array("files", 10), async (req, res) => {
 
     const newPost = new Post({
       userId, // just keep reference
+      username: user.username,
+      profilePicture: user.profilePicture,
       content,
       images,
     });
@@ -408,7 +410,7 @@ router.post("/:postId/comment", async (req, res) => {
     const { userId, text } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text ) {
+    if (!userId || !text) {
       return res.status(400).json({ message: "userId and text are required" });
     }
 
@@ -426,6 +428,8 @@ router.post("/:postId/comment", async (req, res) => {
     // Store username inside the comment
     post.comments.push({
       userId,
+      username: user.username,
+      profilePicture: user.profilePicture,
       text
     });
 
