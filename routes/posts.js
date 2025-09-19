@@ -94,9 +94,7 @@ router.post("/", upload.array("files", 10), async (req, res) => {
     }
 
     const newPost = new Post({
-      userId,
-      username: user.username,
-      profilePicture: user.profilePicture,
+      userId, // just keep reference
       content,
       images,
     });
@@ -428,8 +426,6 @@ router.post("/:postId/comment", async (req, res) => {
     // Store username inside the comment
     post.comments.push({
       userId,
-      username: user.username,
-      profilePicture: user.profilePicture,
       text
     });
 
