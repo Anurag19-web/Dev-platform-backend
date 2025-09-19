@@ -307,7 +307,32 @@ router.get("/user/:userId", async (req, res) => {
 
   try {
     // Fetch all posts by the specified user
-    const posts = await Post.find({ userId }).sort({ createdAt: -1 }).lean();
+    const posts = await Post.aggregate([
+      { $match: { userId } },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "userId",
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          content: 1,
+          images: 1,
+          likes: 1,
+          comments: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userId: 1,
+          username: "$userInfo.username",
+          profilePicture: "$userInfo.profilePicture"
+        }
+      }
+    ]);
 
     // Optional: include likes and comments as stored
     res.json({ posts });
