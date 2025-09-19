@@ -405,11 +405,11 @@ router.get("/:postId/likes", async (req, res) => {
 /* ---------------- ADD COMMENT ---------------- */
 router.post("/:postId/comment", async (req, res) => {
   try {
-    const { userId, text, username } = req.body;
+    const { userId, text } = req.body;
     const { postId } = req.params;
 
-    if (!userId || !text || !username) {
-      return res.status(400).json({ message: "userId and text and username are required" });
+    if (!userId || !text ) {
+      return res.status(400).json({ message: "userId and text are required" });
     }
 
     // Find user to get username
@@ -434,8 +434,6 @@ router.post("/:postId/comment", async (req, res) => {
     const commentsWithUsers = post.comments.map(c => ({
       _id: c._id,
       userId: c.userId,
-      username: c.username,
-      profilePicture: c.profilePicture,
       text: c.text,
       createdAt: c.createdAt
     }));

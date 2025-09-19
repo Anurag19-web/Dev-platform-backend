@@ -6,14 +6,6 @@ const postSchema = new mongoose.Schema({
     ref: "User",
     required: true
   },
-  username: {
-    type: String,
-    required: true,
-  },
-  profilePicture: {
-    type: String,
-    default: ""
-  },
   content: {
     type: String,
     required: true
@@ -31,8 +23,6 @@ const postSchema = new mongoose.Schema({
   comments: [
     {
       userId: { type: String, ref: "User", required: true },
-      username: { type: String, required: true },
-      profilePicture: { type: String, required: true },
       text: { type: String, required: true },
       createdAt: { type: Date, default: Date.now }
     }
