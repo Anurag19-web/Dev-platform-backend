@@ -616,6 +616,7 @@ router.get("/user/:userId", async (req, res) => {
       { $match: { userId } },
       { $sort: { createdAt: -1 } },
 
+      // Lookup post owner
       {
         $lookup: {
           from: "users",
@@ -625,6 +626,57 @@ router.get("/user/:userId", async (req, res) => {
         }
       },
       { $unwind: "$userInfo" },
+
+      // Lookup commenters
+      {
+        $lookup: {
+          from: "users",
+          localField: "comments.userId",
+          foreignField: "userId",
+          as: "commentUsers"
+        }
+      },
+
+      // Rebuild comments with user info
+      {
+        $addFields: {
+          comments: {
+            $map: {
+              input: "$comments",
+              as: "c",
+              in: {
+                _id: "$$c._id",
+                text: "$$c.text",
+                createdAt: "$$c.createdAt",
+                userId: "$$c.userId",
+                user: {
+                  $let: {
+                    vars: {
+                      u: {
+                        $arrayElemAt: [
+                          {
+                            $filter: {
+                              input: "$commentUsers",
+                              as: "u",
+                              cond: { $eq: ["$$u.userId", "$$c.userId"] }
+                            }
+                          },
+                          0
+                        ]
+                      }
+                    },
+                    in: {
+                      userId: "$$u.userId",
+                      username: "$$u.username",
+                      profilePicture: "$$u.profilePicture"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
 
       {
         $project: {
