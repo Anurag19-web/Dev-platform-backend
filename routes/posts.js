@@ -94,8 +94,8 @@ router.post("/", upload.array("files", 10), async (req, res) => {
 
     const newPost = new Post({
       userId,
-      username: user.username,
-      profilePicture: user.profilePicture,
+      // username: user.username,
+      // profilePicture: user.profilePicture,
       content,
       images,
     });
@@ -169,7 +169,31 @@ router.get("/feed/:userId", async (req, res) => {
 /* ---------------- GET ALL POSTS ---------------- */
 router.get("/", async (req, res) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 }).lean();
+    const posts = await Post.aggregate([
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "userId",
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          content: 1,
+          images: 1,
+          likes: 1,
+          comments: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userId: 1,
+          username: "$userInfo.username",
+          profilePicture: "$userInfo.profilePicture"
+        }
+      }
+    ]);
 
     const userIds = [
       ...new Set([
@@ -427,8 +451,8 @@ router.post("/:postId/comment", async (req, res) => {
     // Store username inside the comment
     post.comments.push({
       userId,
-      username: user.username,
-      profilePicture: user.profilePicture,
+      // username: user.username,
+      // profilePicture: user.profilePicture,
       text
     });
 
