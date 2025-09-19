@@ -1,6 +1,7 @@
 // routes/savePost.js
 import express from "express";
 import User from "../models/User.js";
+import { Post } from "../models/Post.js";
 
 const router = express.Router();
 
@@ -56,26 +57,23 @@ router.get("/:userId/saved", async (req, res) => {
     const user = await User.findOne({ userId });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Import Post model dynamically
-    const Post = await import("../models/Post.js").then(m => m.default);
+    if (!user.savedPosts || user.savedPosts.length === 0) return res.json([]);
 
-    // Fetch posts using saved post IDs
-    const posts = await Post.find({ postId: { $in: user.savedPosts } });
+    // Convert savedPosts to ObjectId
+    const postObjectIds = user.savedPosts.map(id => mongoose.Types.ObjectId(id));
+
+    const posts = await Post.find({ _id: { $in: postObjectIds } });
 
     if (!posts.length) return res.json([]);
 
-    // Get all unique userIds from posts
     const uniqueUserIds = [...new Set(posts.map(p => p.userId))];
-
-    // Fetch user details for these posts
     const users = await User.find({ userId: { $in: uniqueUserIds } });
     const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
 
-    // Map posts with username & profilePicture dynamically
     const savedPosts = posts.map(post => ({
       ...post._doc,
       username: userMap[post.userId]?.username || "Unknown",
-      profilePicture: userMap[post.userId]?.profilePicture || "default.png",
+      profilePicture: userMap[post.userId]?.profilePicture || "default.png"
     }));
 
     res.json(savedPosts);
@@ -84,6 +82,5 @@ router.get("/:userId/saved", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
 
 export default router;
