@@ -1,5 +1,6 @@
 // routes/savePost.js
 import express from "express";
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import { Post } from "../models/Post.js";
 
