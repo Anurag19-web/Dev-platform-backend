@@ -61,25 +61,36 @@ router.get("/:userId/saved", async (req, res) => {
 
     if (!user.savedPosts || user.savedPosts.length === 0) return res.json([]);
 
-    // Convert savedPosts to ObjectId safely
-    const postObjectIds = user.savedPosts
-      .filter(id => mongoose.Types.ObjectId.isValid(id)) // <-- only keep valid IDs
-      .map(id => mongoose.Types.ObjectId(id));
-
-    if (!postObjectIds.length) return res.json([]);
-
-    const posts = await Post.find({ _id: { $in: postObjectIds } });
-    if (!posts.length) return res.json([]);
-
-    const uniqueUserIds = [...new Set(posts.map(p => p.userId))];
-    const users = await User.find({ userId: { $in: uniqueUserIds } });
-    const userMap = Object.fromEntries(users.map(u => [u.userId, u]));
-
-    const savedPosts = posts.map(post => ({
-      ...post._doc,
-      username: userMap[post.userId]?.username || "Unknown",
-      profilePicture: userMap[post.userId]?.profilePicture || "default.png"
-    }));
+    // Use MongoDB aggregation with $lookup to fetch posts + user details
+    const savedPosts = await Post.aggregate([
+      {
+        $match: {
+          _id: { $in: user.savedPosts.map(id => new mongoose.Types.ObjectId(id)) }
+        }
+      },
+      {
+        $lookup: {
+          from: "users", // Mongo collection name for User model
+          localField: "userId",
+          foreignField: "userId",
+          as: "userDetails"
+        }
+      },
+      { $unwind: "$userDetails" },
+      {
+        $project: {
+          _id: 1,
+          content: 1,
+          images: 1,
+          likes: 1,
+          comments: 1,
+          shares: 1,
+          createdAt: 1,
+          username: "$userDetails.username",
+          profilePicture: "$userDetails.profilePicture"
+        }
+      }
+    ]);
 
     res.json(savedPosts);
   } catch (err) {
