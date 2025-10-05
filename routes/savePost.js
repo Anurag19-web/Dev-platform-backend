@@ -80,6 +80,7 @@ router.get("/:userId/saved", async (req, res) => {
       {
         $project: {
           _id: 1,
+          userId: 1,
           content: 1,
           images: 1,
           likes: 1,
