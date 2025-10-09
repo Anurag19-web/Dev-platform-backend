@@ -11,7 +11,6 @@ import userRoutes from "./routes/users.js";
 import postsRoutes from "./routes/posts.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import savePostRoutes from "./routes/savePost.js";
-import { Translate } from "@google-cloud/translate/build/src/v2/index.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -43,10 +42,6 @@ const corsOptions = {
 // ✅ Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Initialize Google Translate API
-const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-const translate = new Translate({ credentials });
-
 // ✅ Handle all OPTIONS requests manually (important!)
 app.options("*", (req, res) => {
   res.set({
@@ -76,18 +71,6 @@ app.use("/api/save", savePostRoutes);
 
 // ✅ Serve static profile images
 app.use("/uploads", express.static("uploads"));
-
-// --- Add Translation endpoint ---
-app.post("/api/translate", async (req, res) => {
-  try {
-    const { text, targetLang } = req.body; // e.g., targetLang = 'hi' or 'gu'
-    const [translation] = await translate.translate(text, targetLang);
-    res.json({ translation });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Translation failed" });
-  }
-});
 
 // ✅ Health Check Route
 app.get("/", (req, res) => {
