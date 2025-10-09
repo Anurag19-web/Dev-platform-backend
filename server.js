@@ -42,7 +42,6 @@ const corsOptions = {
 
 // ✅ Apply CORS middleware
 app.use(cors(corsOptions));
-app.use(bodyParser.json());
 
 // Initialize Google Translate API
 const translate = new Translate({ keyFilename: "./google-translate-key.json" });
