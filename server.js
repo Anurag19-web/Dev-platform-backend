@@ -44,7 +44,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Initialize Google Translate API
-const translate = new Translate({ keyFilename: "./google-translate-key.json" });
+const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const translate = new Translate({ credentials });
 
 // ✅ Handle all OPTIONS requests manually (important!)
 app.options("*", (req, res) => {
